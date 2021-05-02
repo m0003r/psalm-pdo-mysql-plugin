@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<ruleset name="PHP_CodeSniffer">
+    <config name="installed_paths" value="../../slevomat/coding-standard"/>
+
+    <rule ref="Generic.Arrays.DisallowLongArraySyntax"/>
+
+    <rule ref="PSR1"/>
+    <rule ref="PSR12">
+        <exclude name="PSR12.ControlStructures.ControlStructureSpacing.FirstExpressionLine" />
+    </rule>
+
+    <rule ref="PEAR.WhiteSpace.ObjectOperatorIndent"/>
+
+    <rule ref="SlevomatCodingStandard.Arrays.MultiLineArrayEndBracketPlacement"/>
+    <rule ref="SlevomatCodingStandard.Arrays.SingleLineArrayWhitespace"/>
+    <rule ref="SlevomatCodingStandard.Arrays.TrailingArrayComma"/>
+    <rule ref="SlevomatCodingStandard.Classes.ModernClassNameReference"/>
+    <rule ref="SlevomatCodingStandard.Classes.PropertySpacing"/>
+    <rule ref="SlevomatCodingStandard.ControlStructures.BlockControlStructureSpacing"/>
+    <rule ref="SlevomatCodingStandard.Functions.RequireArrowFunction"/>
+    <rule ref="SlevomatCodingStandard.Functions.ArrowFunctionDeclaration"/>
+    <rule ref="SlevomatCodingStandard.Functions.StaticClosure"/>
+    <rule ref="SlevomatCodingStandard.Namespaces.AlphabeticallySortedUses"/>
+    <rule ref="SlevomatCodingStandard.PHP.ShortList"/>
+    <rule ref="SlevomatCodingStandard.PHP.TypeCast"/>
+    <rule ref="SlevomatCodingStandard.Namespaces.ReferenceUsedNamesOnly">
+        <properties>
+            <property name="searchAnnotations" value="true"/>
+        </properties>
+    </rule>
+    <rule ref="SlevomatCodingStandard.Namespaces.UnusedUses">
+        <properties>
+            <property name="searchAnnotations" value="true"/>
+        </properties>
+    </rule>
+    <rule ref="SlevomatCodingStandard.ControlStructures.UselessIfConditionWithReturn"/>
+    <rule ref="SlevomatCodingStandard.TypeHints.DeclareStrictTypes">
+        <properties>
+            <property name="newlinesCountBetweenOpenTagAndDeclare" value="2"/>
+            <property name="spacesCountAroundEqualsSign" value="0"/>
+        </properties>
+    </rule>
+    <rule ref="SlevomatCodingStandard.PHP.UselessSemicolon"/>
+    <rule ref="SlevomatCodingStandard.ControlStructures.DisallowYodaComparison"/>
+    <rule ref="SlevomatCodingStandard.TypeHints.NullableTypeForNullDefaultValue"/>
+    <rule ref="SlevomatCodingStandard.TypeHints.ParameterTypeHint"/>
+    <rule ref="SlevomatCodingStandard.TypeHints.ReturnTypeHint">
+        <properties>
+            <property name="traversableTypeHints" type="array">
+                <element value="" />
+            </property>
+        </properties>
+    </rule>
+    <rule ref="SlevomatCodingStandard.ControlStructures.RequireMultiLineCondition"/>
+
+
+    <file>src/</file>
+    <file>tests/</file>
+
+</ruleset>

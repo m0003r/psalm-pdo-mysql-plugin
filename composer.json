@@ -1,0 +1,61 @@
+{
+  "name": "m03r/psalm-pdo-mysql-plugin",
+  "type": "psalm-plugin",
+  "description": "Let Psalm understand values, returned from PDO statements in MySQL",
+  "keywords": [
+    "php",
+    "code",
+    "inspection",
+    "pdo",
+    "mysql",
+    "psalm",
+    "psalm-plugin"
+  ],
+  "authors": [
+    {
+      "name": "m03r",
+      "email": "m03r@m03r.net"
+    }
+  ],
+  "require": {
+    "php": "^7.3|8",
+    "ext-libxml": "*",
+    "ext-pdo": "*",
+    "ext-pdo_mysql": "*",
+    "ext-simplexml": "*",
+    "ext-xmlwriter": "*",
+    "phpmyadmin/sql-parser": "^5.4",
+    "vimeo/psalm": "^4.7"
+  },
+  "require-dev": {
+    "codeception/codeception": "^4.1",
+    "codeception/module-asserts": "^1.3",
+    "codeception/module-cli": "^1.1",
+    "codeception/module-filesystem": "^1.0",
+    "phpspec/prophecy-phpunit": "^2.0",
+    "phpunit/phpunit": "^9.5",
+    "psalm/plugin-phpunit": "^0.15.1",
+    "slevomat/coding-standard": "^7.0",
+    "squizlabs/php_codesniffer": "^3.6",
+    "weirdan/codeception-psalm-module": "^0.13.1"
+  },
+  "config": {
+    "sort-packages": true
+  },
+  "extra": {
+    "psalm": {
+      "pluginClass": "\\M03r\\PsalmPDOMySQL\\Plugin"
+    }
+  },
+  "autoload": {
+    "psr-4": {
+      "M03r\\PsalmPDOMySQL\\": "src"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "M03r\\PsalmPDOMySQL\\Test\\": "tests",
+      "M03r\\PsalmPDOMySQL\\Test\\Integration\\": "tests/Integration/_support"
+    }
+  }
+}

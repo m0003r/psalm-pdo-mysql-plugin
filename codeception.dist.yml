@@ -1,0 +1,29 @@
+namespace: "M03r\\PsalmPDOMySQL\\Test\\Integration"
+
+# suite config
+suites:
+  acceptance:
+    actor: "AcceptanceTester"
+    path: "."
+    modules:
+      enabled:
+        - "Cli"
+        - "Filesystem"
+        - \Weirdan\Codeception\Psalm\Module:
+            default_dir: ".build/codeception/"
+        - "\\M03r\\PsalmPDOMySQL\\Test\\Integration\\Helper\\Acceptance"
+
+extensions:
+  enabled: ["Codeception\\Extension\\RunFailed"]
+
+# additional paths
+paths:
+  tests: "tests/Integration"
+  output: "tests/Integration/_output"
+  data: "tests/Integration/_data"
+  support: "tests/Integration/_support"
+  envs: "tests/Integration/_envs"
+
+settings:
+  shuffle: false
+  lint: true
