@@ -213,7 +213,7 @@ class SQLParserTest extends TestCase
                     'a' => 'numeric-string|null',
                 ],
             ],
-            'intersecting *' => [
+            'intersecting star' => [
                 'SELECT * FROM single INNER JOIN single',
                 [
                     'id' => 'numeric-string',

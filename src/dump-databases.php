@@ -64,14 +64,14 @@ foreach ($databases as $database) {
             }
 
             $oldTable = $table;
-            $writer->startElement('table_structure');
+            $writer->startElement('table');
             $writer->writeAttribute('name', $table);
         }
 
-        $writer->startElement('field');
-        $writer->writeAttribute('Field', $column);
-        $writer->writeAttribute('Type', $type);
-        $writer->writeAttribute('Null', $nullable);
+        $writer->startElement('column');
+        $writer->writeAttribute('name', $column);
+        $writer->writeAttribute('type', $type);
+        $writer->writeAttribute('nullable', $nullable);
         $writer->endElement();
     }
 

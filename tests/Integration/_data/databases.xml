@@ -1,43 +1,43 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <databases>
     <database name="test">
-        <table_structure name="basic_types">
-            <field Field="t_enumABC" Null="false" Type="ENUM('A', 'B', 'C')"/>
-            <field Field="t_varchar" Null="false" Type="varchar"/>
-            <field Field="t_char" Null="false" Type="char"/>
-            <field Field="t_text" Null="false" Type="text"/>
-            <field Field="t_int" Null="false" Type="decimal"/>
-            <field Field="t_float" Null="false" Type="float"/>
-        </table_structure>
-        <table_structure name="all_types">
-            <field Field="t_integer" Null="false" Type="integer"/>
-            <field Field="t_int" Null="false" Type="int"/>
-            <field Field="t_smallint" Null="false" Type="smallint"/>
-            <field Field="t_tinyint" Null="false" Type="tinyint"/>
-            <field Field="t_mediumint" Null="false" Type="mediumint"/>
-            <field Field="t_bigint" Null="false" Type="bigint"/>
-            <field Field="t_decimal" Null="false" Type="decimal"/>
-            <field Field="t_numeric" Null="false" Type="numeric"/>
-            <field Field="t_float" Null="false" Type="float"/>
-            <field Field="t_double" Null="false" Type="double"/>
-            <field Field="t_bit" Null="false" Type="bit"/>
-            <field Field="t_date" Null="false" Type="date"/>
-            <field Field="t_datetime" Null="false" Type="datetime"/>
-            <field Field="t_timestamp" Null="false" Type="timestamp"/>
-            <field Field="t_time" Null="false" Type="time"/>
-            <field Field="t_year" Null="false" Type="year"/>
-            <field Field="t_char" Null="false" Type="char"/>
-            <field Field="t_varchar" Null="false" Type="varchar"/>
-            <field Field="t_binary" Null="false" Type="binary"/>
-            <field Field="t_varbinary" Null="false" Type="varbinary"/>
-            <field Field="t_blob" Null="false" Type="blob"/>
-            <field Field="t_text" Null="false" Type="text"/>
-            <field Field="t_enum" Null="false" Type="enum('F','U','L')"/>
-            <field Field="t_set" Null="false" Type="set"/>
-        </table_structure>
-        <table_structure name="single">
-            <field Field="id" Null="false" Type="tinyint" />
-        </table_structure>
+        <table name="basic_types">
+            <column name="t_enumABC" nullable="false" type="ENUM('A', 'B', 'C')"/>
+            <column name="t_varchar" nullable="false" type="varchar"/>
+            <column name="t_char" nullable="false" type="char"/>
+            <column name="t_text" nullable="false" type="text"/>
+            <column name="t_int" nullable="false" type="decimal"/>
+            <column name="t_float" nullable="false" type="float"/>
+        </table>
+        <table name="all_types">
+            <column name="t_integer" nullable="false" type="integer"/>
+            <column name="t_int" nullable="false" type="int"/>
+            <column name="t_smallint" nullable="false" type="smallint"/>
+            <column name="t_tinyint" nullable="false" type="tinyint"/>
+            <column name="t_mediumint" nullable="false" type="mediumint"/>
+            <column name="t_bigint" nullable="false" type="bigint"/>
+            <column name="t_decimal" nullable="false" type="decimal"/>
+            <column name="t_numeric" nullable="false" type="numeric"/>
+            <column name="t_float" nullable="false" type="float"/>
+            <column name="t_double" nullable="false" type="double"/>
+            <column name="t_bit" nullable="false" type="bit"/>
+            <column name="t_date" nullable="false" type="date"/>
+            <column name="t_datetime" nullable="false" type="datetime"/>
+            <column name="t_timestamp" nullable="false" type="timestamp"/>
+            <column name="t_time" nullable="false" type="time"/>
+            <column name="t_year" nullable="false" type="year"/>
+            <column name="t_char" nullable="false" type="char"/>
+            <column name="t_varchar" nullable="false" type="varchar"/>
+            <column name="t_binary" nullable="false" type="binary"/>
+            <column name="t_varbinary" nullable="false" type="varbinary"/>
+            <column name="t_blob" nullable="false" type="blob"/>
+            <column name="t_text" nullable="false" type="text"/>
+            <column name="t_enum" nullable="false" type="enum('F','U','L')"/>
+            <column name="t_set" nullable="false" type="set"/>
+        </table>
+        <table name="single">
+            <column name="id" nullable="false" type="tinyint" />
+        </table>
     </database>
 </databases>
 

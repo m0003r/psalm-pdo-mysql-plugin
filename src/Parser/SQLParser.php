@@ -291,23 +291,23 @@ class SQLParser
             self::$databases[$databaseName] = [];
 
             /** @var SimpleXMLElement $table */
-            foreach ($database->table_structure as $table) {
+            foreach ($database->table as $table) {
                 $tableName = (string)$table['name'];
                 self::$databases[$databaseName][$tableName] = [];
 
-                /** @var SimpleXMLElement $field */
-                foreach ($table->field as $field) {
-                    $fieldName = (string)$field['Field'];
-                    $nullable = (string)$field['Null'] === 'YES';
-                    $type = (string)$field['Type'];
+                /** @var SimpleXMLElement $column */
+                foreach ($table->column as $column) {
+                    $columnName = (string)$column['name'];
+                    $nullable = strtoupper((string)$column['nullable']) === 'YES';
+                    $type = (string)$column['type'];
 
                     if (strtolower($databaseName) === 'information_schema') {
                         $databaseName = strtolower($databaseName);
                         $tableName = strtolower($tableName);
                     }
 
-                    self::$databases[$databaseName][$tableName][$fieldName]
-                        = self::$databases[$databaseName][$tableName][strtolower($fieldName)]
+                    self::$databases[$databaseName][$tableName][$columnName]
+                        = self::$databases[$databaseName][$tableName][strtolower($columnName)]
                         = new ColumnType($type, $nullable);
                 }
             }

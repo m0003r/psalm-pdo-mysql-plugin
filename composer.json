@@ -28,6 +28,7 @@
     "vimeo/psalm": "^4.7"
   },
   "require-dev": {
+    "ext-pcov": "*",
     "codeception/codeception": "^4.1",
     "codeception/module-asserts": "^1.3",
     "codeception/module-cli": "^1.1",
@@ -59,5 +60,17 @@
       "M03r\\PsalmPDOMySQL\\Test\\": "tests",
       "M03r\\PsalmPDOMySQL\\Test\\Integration\\": "tests/Integration/_support"
     }
+  },
+  "scripts": {
+    "fix": "phpcbf",
+    "psalm": "psalm --no-diff --no-cache --threads=1 --find-dead-code",
+    "test-all": [
+      "parallel-lint src tests",
+      "phpcs",
+      "@psalm",
+      "phpunit",
+      "codecept run --steps",
+      "infection"
+    ]
   }
 }

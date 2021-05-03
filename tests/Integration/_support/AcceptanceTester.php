@@ -20,6 +20,7 @@ use Codeception\Actor;
  * @method void comment($description)
  * @method void pause()
  * @SuppressWarnings(PHPMD)
+ * @psalm-suppress UnusedClass
  */
 final class AcceptanceTester extends Actor
 {

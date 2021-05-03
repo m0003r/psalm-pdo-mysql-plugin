@@ -9,5 +9,6 @@
     },
     "mutators": {
         "@default": true
-    }
+    },
+    "tmpDir": ".build"
 }
