@@ -1,6 +1,9 @@
 <?php
 
+declare(strict_types=1);
 
+// phpcs:disable PSR2.Classes.PropertyDeclaration.Underscore
+// phpcs:disable PSR1.Classes.ClassDeclaration.MissingNamespace
 class PDOStatement
 {
     /** @var bool */
@@ -12,7 +15,9 @@ class PDOStatement
      * @psalm-assert-if-false true $this->__psalm_rowCountZero
      * @psalm-assert true $this->__psalm_rowCountFetched
      */
-    public function rowCount() {}
+    public function rowCount(): void
+    {
+    }
 
 //    /**
 //     * @psalm-assert true|false $this->__psalm_rowCountZero

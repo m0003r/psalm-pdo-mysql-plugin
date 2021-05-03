@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace M03r\PsalmPDOMySQL\Test;
 
+use Generator;
 use M03r\PsalmPDOMySQL\Parser\SQLParser;
 use PHPUnit\Framework\TestCase;
 
@@ -13,20 +16,23 @@ class SQLParserTest extends TestCase
         SQLParser::loadDatabaseDescription($xml);
     }
 
-    public function validDataProvider()
+    /**
+     * @return Generator<string, array{string, array<string, bool>}, empty, void>
+     */
+    public function validDataProvider(): Generator
     {
         yield 'simple' => [
             "SELECT 1 as data",
             [
                 'data' => false,
-            ]
+            ],
         ];
     }
 
     /**
      * @dataProvider validDataProvider
      */
-    public function testSQLParser(string $query, ?array $columnTypes, bool $aggregating = false)
+    public function testSQLParser(string $query, ?array $columnTypes, bool $aggregating = false): void
     {
         $colTypes = SQLParser::parseSQL($query);
         $this->assertEquals($columnTypes, $colTypes);

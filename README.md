@@ -1,5 +1,28 @@
 This plugin let Psalm better understand MySQL `SELECT`'s, executed via PDO.
 
+Usage example
+=====
+
+Database:
+```sql
+CREATE TABLE `users` (
+    `id` INT UNSINGED NOT NULL AUTO_INCREMENT,
+    `username` VARCHAR(255) NOT NULL,
+    `email` VARCHAR(255),
+    PRIMARY KEY (`id`)
+);
+```
+
+Code:
+```php
+<?php
+
+/** @return array{id: string, username: string, email: ?string} */
+function fetchUser(PDO $pdo): array {
+    return $pdo->query("SELECT * FROM users WHERE id=1")->fetch(PDO::FETCH_ASSOC);
+} 
+```
+
 Configuration
 =====
 

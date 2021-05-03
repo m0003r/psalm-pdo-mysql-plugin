@@ -1,5 +1,6 @@
 <?php
 
+declare(strict_types=1);
 
 namespace M03r\PsalmPDOMySQL\Test;
 
@@ -8,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Prophecy\Argument;
 use Prophecy\PhpUnit\ProphecyTrait;
 use Psalm\Plugin\RegistrationInterface;
+use SimpleXMLElement;
 
 class RegistrationTest extends TestCase
 {
@@ -30,8 +32,8 @@ class RegistrationTest extends TestCase
         $registration->addStubFile()->shouldNotBeCalled();
         $registration->registerHooksFromClass()->shouldNotBeCalled();
 
-        /** @var \SimpleXMLElement $config */
-        $config = (new \SimpleXMLElement('<config><foo /><bar /></config>'))->config;
+        /** @var SimpleXMLElement $config */
+        $config = (new SimpleXMLElement('<config><foo /><bar /></config>'))->config;
         $plugin($registration->reveal(), $config);
     }
 
@@ -42,6 +44,9 @@ class RegistrationTest extends TestCase
         $registration->addStubFile(Argument::any())->shouldBeCalled();
         $registration->registerHooksFromClass(Argument::any())->shouldBeCalled();
 
-        $plugin($registration->reveal(), (new \SimpleXMLElement('<config><databases><database name="empty" /></databases></config>')));
+        $plugin($registration->reveal(), (
+            new SimpleXMLElement(
+                '<config><databases><database name="empty" /></databases></config>'
+            )));
     }
 }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 const INFO_QUERY = <<<SQL
 SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, IS_NULLABLE FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = :schema
@@ -22,9 +24,11 @@ USAGE, basename($argv[0]));
 $dsn = $argv[1];
 $username = null;
 $password = null;
+
 if ($separator_index > 2) {
     $username = $argv[2];
 }
+
 if ($separator_index > 3) {
     $password = $argv[3];
 }
@@ -47,26 +51,33 @@ foreach ($databases as $database) {
     $writer->startElement('database');
     $writer->writeAttribute('name', $database);
     $oldTable = null;
+
     while (/** @var array{0: string, 1: string, 2: string, 3: string} */
-    $row = $stmt->fetch(PDO::FETCH_NUM)) {
+        $row = $stmt->fetch(PDO::FETCH_NUM)
+    ) {
         [$table, $column, $type, $nullable] = $row;
+
         if ($oldTable !== $table) {
             if ($oldTable !== null) {
                 $writer->endElement();
             }
+
             $oldTable = $table;
             $writer->startElement('table_structure');
             $writer->writeAttribute('name', $table);
         }
+
         $writer->startElement('field');
         $writer->writeAttribute('Field', $column);
         $writer->writeAttribute('Type', $type);
         $writer->writeAttribute('Null', $nullable);
         $writer->endElement();
     }
+
     if ($oldTable !== null) {
         $writer->endElement();
     }
+
     $writer->endElement();
 }
 

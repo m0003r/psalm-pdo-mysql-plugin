@@ -15,27 +15,20 @@ use M03r\PsalmPDOMySQL\Types\TSqlSelectString;
 use PDO;
 use PhpMyAdmin\SqlParser\Exceptions\ParserException;
 use PhpParser\Node\Arg;
-use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\MethodCall;
-use PhpParser\Node\Expr\StaticCall;
-use Psalm\Codebase;
 use Psalm\CodeLocation;
-use Psalm\Context;
-use Psalm\FileManipulation;
 use Psalm\Internal\Analyzer\Statements\Expression\ExpressionIdentifier;
-use Psalm\Internal\Provider\ReturnTypeProvider\PdoStatementReturnTypeProvider;
-use Psalm\Issue\CodeIssue;
 use Psalm\IssueBuffer;
 use Psalm\Plugin\EventHandler\AfterMethodCallAnalysisInterface;
 use Psalm\Plugin\EventHandler\Event\AfterMethodCallAnalysisEvent;
-use Psalm\Plugin\EventHandler\Event\MethodReturnTypeProviderEvent;
 use Psalm\StatementsSource;
 use Psalm\Type;
 use UnexpectedValueException;
 
 class FetchChecker implements AfterMethodCallAnalysisInterface
 {
-    public static function afterMethodCallAnalysis(AfterMethodCallAnalysisEvent $event): void {
+    public static function afterMethodCallAnalysis(AfterMethodCallAnalysisEvent $event): void
+    {
         $expr = $event->getExpr();
         $method_id = $event->getMethodId();
         $statements_source = $event->getStatementsSource();
@@ -62,11 +55,6 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
         if (!$pdoStatement) {
             return;
         }
-
-        $provider = $event->getStatementsSource()->getNodeTypeProvider();
-        $arg_types = array_map(function($arg) use ($provider): ?Type\Union {
-            return $provider->getType($arg->value);
-        }, $event->getExpr()->args);
 
         if (strpos($method_id, "PDOStatement::execute") === 0) {
             $pdoStatement->executed = true;
@@ -129,8 +117,7 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
         StatementsSource $source,
         CodeLocation $location,
         array $args
-    ): ?Type\Union
-    {
+    ): ?Type\Union {
         $isSuitableMethod =
             $methodName === 'fetch'
             || $methodName === 'fetchall'
@@ -353,6 +340,7 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
             if ($fetch_mode === PDO::FETCH_OBJ) {
                 return new Type\Union([new Type\Atomic\TObjectWithProperties($properties)]);
             }
+
             return new Type\Union([new Type\Atomic\TKeyedArray($properties)]);
         }
 
@@ -393,5 +381,4 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
 
         return $atomic;
     }
-
 }

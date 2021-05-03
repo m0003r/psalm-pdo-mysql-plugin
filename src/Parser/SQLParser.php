@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace M03r\PsalmPDOMySQL\Parser;
 
 use PhpMyAdmin\SqlParser\Components\Expression;
+use SimpleXMLElement;
 use UnexpectedValueException;
 
 class SQLParser
@@ -254,10 +255,10 @@ class SQLParser
         return null;
     }
 
-    public static function loadDatabaseDescription(\SimpleXMLElement $databases): void
+    public static function loadDatabaseDescription(SimpleXMLElement $databases): void
     {
         if (!is_countable($databases->database) || count($databases->database) === 0) {
-            throw new \UnexpectedValueException("No databases configured");
+            throw new UnexpectedValueException("No databases configured");
         }
 
         foreach ($databases->database as $database) {

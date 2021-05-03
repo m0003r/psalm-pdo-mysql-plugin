@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace M03r\PsalmPDOMySQL\Hooks;
 
-use M03r\PsalmPDOMySQL\Types\TPDOStatement;
 use M03r\PsalmPDOMySQL\Types\SQLStringProvider;
+use M03r\PsalmPDOMySQL\Types\TPDOStatement;
 use M03r\PsalmPDOMySQL\Types\TSqlSelectString;
 use PhpParser\Node;
 use PhpParser\NodeTraverser;
-use Psalm\Plugin\EventHandler\AfterMethodCallAnalysisInterface;
-use Psalm\Plugin\EventHandler\Event\AfterMethodCallAnalysisEvent;
 use Psalm\Plugin\EventHandler\Event\MethodReturnTypeProviderEvent;
 use Psalm\Plugin\EventHandler\MethodReturnTypeProviderInterface;
 use Psalm\Type;
@@ -19,13 +17,15 @@ use function class_exists;
 
 class PDOMethodsReturnType implements MethodReturnTypeProviderInterface
 {
+    /** @inheritDoc */
     public static function getClassLikeNames(): array
     {
         return ['PDO'];
     }
 
     /** @inheritDoc */
-    public static function getMethodReturnType(MethodReturnTypeProviderEvent $event): ?Type\Union {
+    public static function getMethodReturnType(MethodReturnTypeProviderEvent $event): ?Type\Union
+    {
         $methodName = $event->getMethodNameLowercase();
         $args = $event->getCallArgs();
         $source = $event->getSource();

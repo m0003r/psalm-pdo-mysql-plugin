@@ -1,8 +1,8 @@
 <?php
 
+declare(strict_types=1);
 
 namespace M03r\PsalmPDOMySQL\Types;
-
 
 use Psalm\Context;
 use Psalm\Type\Atomic\TBool;
@@ -38,14 +38,14 @@ class TPDOStatement extends TNamedObject
     {
         if ($this->extra_types) {
             return $this->value . $this->getQueryKey() . '&' . implode(
-                    '&',
-                    array_map(
-                        function ($type) {
-                            return $type->getId(true);
-                        },
-                        $this->extra_types
-                    )
-                );
+                '&',
+                array_map(
+                    static function ($type) {
+                        return $type->getId(true);
+                    },
+                    $this->extra_types
+                )
+            );
         }
 
         return $this->was_static
@@ -64,13 +64,14 @@ class TPDOStatement extends TNamedObject
         $parts = [
             $this->sqlString ? ':SQL(' . $this->sqlString->value . ')' : null,
             $this->executed ? ':executed' : null,
-            $this->hasRows === null ? null : ($this->hasRows ? ':hasRows' : ':zeroRows')
+            $this->hasRows === null ? null : ($this->hasRows ? ':hasRows' : ':zeroRows'),
         ];
 
         return implode('', array_filter($parts));
     }
 
-    public function syncFromContext(Context $context, string $var_id): void {
+    public function syncFromContext(Context $context, string $var_id): void
+    {
         $zeroType = $context->vars_in_scope[$var_id . '->' . self::PROP_ZERO] ?? new Union([new TBool()]);
         $countFetchedType = $context->vars_in_scope[$var_id . '->' . self::PROP_FETCHED] ?? new Union([new TBool()]);
 
@@ -82,7 +83,8 @@ class TPDOStatement extends TNamedObject
         $this->hasRows = !$zeroType->isTrue();
     }
 
-    public function syncToContext(Context $context, string $var_id): void {
+    public function syncToContext(Context $context, string $var_id): void
+    {
         if ($this->hasRows === null) {
             $zeroType = new Union([new TBool()]);
             $countFetchedType = new Union([new TBool()]);
