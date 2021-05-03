@@ -4,8 +4,17 @@ declare(strict_types=1);
 
 namespace M03r\PsalmPDOMySQL\Hooks;
 
+use Exception;
+use M03r\PsalmPDOMySQL\Issues\PDOInvalidFetchClass;
 use M03r\PsalmPDOMySQL\Issues\PDOStatementNotExecuted;
 use M03r\PsalmPDOMySQL\Issues\PDOStatementZeroRows;
+use M03r\PsalmPDOMySQL\Issues\SQLParserIssue;
+use M03r\PsalmPDOMySQL\Parser\SQLParser;
+use M03r\PsalmPDOMySQL\Types\TPDOStatement;
+use M03r\PsalmPDOMySQL\Types\TSqlSelectString;
+use PDO;
+use PhpMyAdmin\SqlParser\Exceptions\ParserException;
+use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\StaticCall;
@@ -14,105 +23,64 @@ use Psalm\CodeLocation;
 use Psalm\Context;
 use Psalm\FileManipulation;
 use Psalm\Internal\Analyzer\Statements\Expression\ExpressionIdentifier;
+use Psalm\Internal\Provider\ReturnTypeProvider\PdoStatementReturnTypeProvider;
+use Psalm\Issue\CodeIssue;
 use Psalm\IssueBuffer;
-use Psalm\Plugin\Hook\AfterMethodCallAnalysisInterface;
+use Psalm\Plugin\EventHandler\AfterMethodCallAnalysisInterface;
+use Psalm\Plugin\EventHandler\Event\AfterMethodCallAnalysisEvent;
+use Psalm\Plugin\EventHandler\Event\MethodReturnTypeProviderEvent;
 use Psalm\StatementsSource;
 use Psalm\Type;
+use UnexpectedValueException;
 
 class FetchChecker implements AfterMethodCallAnalysisInterface
 {
-    private const STATE_PREFIX = '_psalm_mysql_plugin\\state\\';
+    public static function afterMethodCallAnalysis(AfterMethodCallAnalysisEvent $event): void {
+        $expr = $event->getExpr();
+        $method_id = $event->getMethodId();
+        $statements_source = $event->getStatementsSource();
+        $context = $event->getContext();
 
-    /**
-     * @param MethodCall|StaticCall $expr
-     * @param FileManipulation[] $file_replacements
-     */
-    public static function afterMethodCallAnalysis(
-        Expr $expr,
-        string $method_id,
-        string $appearing_method_id,
-        string $declaring_method_id,
-        Context $context,
-        StatementsSource $statements_source,
-        Codebase $codebase,
-        array &$file_replacements = [],
-        ?Type\Union &$return_type_candidate = null
-    ): void {
         if (!$expr instanceof MethodCall) {
             return;
         }
 
-        if ($method_id === '_psalm_mysql_plugin\\PDOStatement::fetchall'
-            && $return_type_candidate
-            && $return_type_candidate->hasArray()
-        ) {
-            $return_type_candidate->removeType('false');
+        if (strpos($method_id, 'PDOStatement::') !== 0) {
+            return;
         }
 
         $var_id = ExpressionIdentifier::getVarId($expr->var, null, $statements_source);
         $sourceType = $context->vars_in_scope[$var_id] ?? null;
 
         if (!$sourceType) {
-            // still no source type :(
             return;
         }
 
-        /** @var array<string, bool>|null $pdoStatementTypes */
-        $pdoStatementTypes = null;
+        /** @var ?TPDOStatement $pdoStatement */
+            $pdoStatement = $sourceType->getAtomicTypes()['PDOStatement'] ?? null;
 
-        foreach ($sourceType->getAtomicTypes() as $atomic) {
-            if (!$atomic instanceof Type\Atomic\TNamedObject) {
-                continue;
-            }
-
-            if (strpos($atomic->getKey(false), '_psalm_mysql_plugin\\PDOStatement') === 0) {
-                $pdoStatementTypes = [
-                    'executed' => false,
-                    'rowCount' => false,
-                    'zeroRows' => false,
-                    'fetched'  => false,
-                ];
-
-                foreach ($atomic->extra_types ?? [] as $extraType) {
-                    $id = $extraType->getKey(false);
-
-                    if (strpos($id, self::STATE_PREFIX) === 0) {
-                        $pdoStatementTypes[substr($id, 26)] = true;
-                    }
-                }
-
-                break;
-            }
-        }
-
-        if ($pdoStatementTypes === null) {
+        if (!$pdoStatement) {
             return;
         }
 
-        if (strpos($method_id, "_psalm_mysql_plugin\\PDOStatement::execute") === 0) {
-            foreach ($sourceType->getAtomicTypes() as $atomic) {
-                if (!$atomic instanceof Type\Atomic\TNamedObject) {
-                    continue;
-                }
+        $provider = $event->getStatementsSource()->getNodeTypeProvider();
+        $arg_types = array_map(function($arg) use ($provider): ?Type\Union {
+            return $provider->getType($arg->value);
+        }, $event->getExpr()->args);
 
-                if ($atomic->extra_types) {
-                    unset(
-                        $atomic->extra_types[self::STATE_PREFIX . 'zeroRows'],
-                        $atomic->extra_types[self::STATE_PREFIX . 'rowCount'],
-                        $atomic->extra_types[self::STATE_PREFIX . 'fetched']
-                    );
-                }
+        if (strpos($method_id, "PDOStatement::execute") === 0) {
+            $pdoStatement->executed = true;
+            $pdoStatement->hasRows = null;
 
-                $atomic->addIntersectionType(
-                    new Type\Atomic\TNamedObject('_psalm_mysql_plugin\\state\\executed')
-                );
-            }
+            $pdoStatement->syncToContext($context, $var_id);
 
             return;
         }
 
-        if (strpos($method_id, "_psalm_mysql_plugin\\PDOStatement::fetch") === 0) {
-            if (!$pdoStatementTypes['executed']) {
+        if (strpos($method_id, "PDOStatement::fetch") === 0) {
+            $pdoStatement->syncFromContext($context, $var_id);
+
+            if (!$pdoStatement->executed) {
                 IssueBuffer::accepts(
                     new PDOStatementNotExecuted(
                         'Statement was not executed',
@@ -122,7 +90,7 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
                 );
             }
 
-            if ($pdoStatementTypes['zeroRows']) {
+            if ($pdoStatement->hasRows === false) {
                 IssueBuffer::accepts(
                     new PDOStatementZeroRows(
                         'PDO statement has zero remaining rows',
@@ -132,39 +100,298 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
                 );
             }
 
-            if ($pdoStatementTypes['rowCount']
-                && !$pdoStatementTypes['zeroRows']
-            ) {
-                if ($return_type_candidate) {
-                    $return_type_candidate->removeType('false');
-                }
+            $returnType = self::getMethodReturnType(
+                $pdoStatement,
+                strtolower(substr($method_id, strlen('PDOStatement::'))),
+                $statements_source,
+                new CodeLocation($statements_source, $event->getExpr()),
+                $event->getExpr()->args
+            );
 
-                if ($method_id === '_psalm_mysql_plugin\\PDOStatement::fetchall'
-                    && $return_type_candidate
-                    && $return_type_candidate->hasArray()
-                    && ($list_type = $return_type_candidate->getAtomicTypes()['array']) instanceof Type\Atomic\TList
-                ) {
-                    $return_type_candidate = new Type\Union([new Type\Atomic\TNonEmptyList($list_type->type_param)]);
-                }
+            if ($returnType) {
+                $event->setReturnTypeCandidate($returnType);
             }
 
-            if ($method_id === "_psalm_mysql_plugin\\PDOStatement::fetchall") {
-                foreach ($sourceType->getAtomicTypes() as $atomic) {
-                    if ($atomic instanceof Type\Atomic\TNamedObject) {
-                        $atomic->addIntersectionType(
-                            new Type\Atomic\TNamedObject('_psalm_mysql_plugin\\state\\zeroRows')
-                        );
+            if ($method_id === 'PDOStatement::fetchall') {
+                $pdoStatement->hasRows = false;
+
+                $pdoStatement->syncToContext($context, $var_id);
+            }
+        }
+    }
+
+    /**
+     * @param Arg[] $args
+     */
+    public static function getMethodReturnType(
+        TPDOStatement $pdoStatement,
+        string $methodName,
+        StatementsSource $source,
+        CodeLocation $location,
+        array $args
+    ): ?Type\Union
+    {
+        $isSuitableMethod =
+            $methodName === 'fetch'
+            || $methodName === 'fetchall'
+            || $methodName === 'fetchcolumn';
+
+        if (!$isSuitableMethod) {
+            return null;
+        }
+
+        $firstArgRequired = $methodName !== 'fetchcolumn';
+
+        // if first arg is set and it isn't single int literal, we can't do anything
+        if (
+            isset($args[0]) &&
+            (
+                !($first_arg_type = $source->getNodeTypeProvider()->getType($args[0]->value)) ||
+                !$first_arg_type->isSingleIntLiteral())
+        ) {
+            return null;
+        }
+
+        // if it is required and
+        if ($firstArgRequired && !isset($args[0])) {
+            return null;
+        }
+
+        $sqlOut = null;
+        $isAggregating = false;
+
+        if ($pdoStatement->sqlString instanceof TSqlSelectString
+        ) {
+            try {
+                $sqlOut = SQLParser::parseSQL($pdoStatement->sqlString->value);
+            } catch (Exception $e) {
+                // it throws UnexpectedValueException only if query is parsed
+                // we don't wanna report parsing of partial queries
+                if ($e instanceof UnexpectedValueException/* || !$strParam->partial*/) {
+                    $message = $e->getMessage();
+
+                    if (($prev = $e->getPrevious()) && $prev instanceof ParserException) {
+                        $message .= (': ' . $prev->getMessage() . ' ' . $prev->token->getInlineToken());
                     }
+
+                    IssueBuffer::accepts(
+                        new SQLParserIssue($message, $location),
+                        $source->getSuppressedIssues()
+                    );
                 }
-            } else {
-                foreach ($sourceType->getAtomicTypes() as $atomic) {
-                    if ($atomic instanceof Type\Atomic\TNamedObject) {
-                        $atomic->addIntersectionType(
-                            new Type\Atomic\TNamedObject('_psalm_mysql_plugin\\state\\fetched')
-                        );
+            }
+        }
+
+        if (isset($first_arg_type)
+            && ($fetch_mode = $first_arg_type->getSingleIntLiteral()->value) === PDO::FETCH_CLASS
+            && isset($args[1])
+            && ($second_arg_type = $source->getNodeTypeProvider()->getType($args[1]->value))
+            && ($second_arg_type->isSingleStringLiteral())
+        ) {
+            $class_name = $second_arg_type->getSingleStringLiteral()->value;
+
+            if (!$source->getCodebase()->classOrInterfaceExists($class_name)) {
+                IssueBuffer::accepts(
+                    new PDOInvalidFetchClass("Class $class_name does not exists", $location),
+                    $source->getSuppressedIssues()
+                );
+            }
+
+            $return_type = new Type\Union([
+                new Type\Atomic\TNamedObject($class_name),
+                new Type\Atomic\TFalse(),
+            ]);
+
+            if ($methodName === 'fetchall') {
+                $return_type->removeType('false');
+                $return_type = new Type\Union([
+                    new Type\Atomic\TList($return_type),
+                ]);
+
+                return $return_type;
+            }
+
+            return $return_type;
+        }
+
+        if (is_array($sqlOut)) {
+            if ($methodName === 'fetchcolumn') {
+                $returnType = self::getRowType(
+                    PDO::FETCH_COLUMN,
+                    $sqlOut,
+                    isset($args[0]) ? $first_arg_type->getSingleIntLiteral()->value : 0
+                );
+
+                if ($returnType) {
+                    if (!$isAggregating && !$pdoStatement->hasRows) {
+                        $returnType->addType(new Type\Atomic\TFalse());
+                    }
+
+                    return $returnType;
+                }
+            } elseif (isset($first_arg_type)) {
+                // fetch or fetchall
+                $rowType = null;
+                $fetch_mode = $first_arg_type->getSingleIntLiteral()->value;
+
+                if ($fetch_mode === PDO::FETCH_ASSOC
+                    || $fetch_mode === PDO::FETCH_BOTH
+                    || $fetch_mode === PDO::FETCH_NUM
+                    || $fetch_mode === PDO::FETCH_OBJ
+                ) {
+                    $rowType = self::getRowType($fetch_mode, $sqlOut);
+                } elseif ($fetch_mode === PDO::FETCH_COLUMN) {
+                    $rowType = self::getRowType($fetch_mode, $sqlOut, 0);
+                }
+
+                if ($rowType !== null) {
+                    switch ($methodName) {
+                        case 'fetch':
+                            if (!$isAggregating && !$pdoStatement->hasRows) {
+                                $rowType->addType(new Type\Atomic\TFalse());
+                            }
+
+                            return $rowType;
+
+                        case 'fetchall':
+                            return new Type\Union([
+                                $isAggregating || $pdoStatement->hasRows ?
+                                    new Type\Atomic\TNonEmptyList($rowType) :
+                                    new Type\Atomic\TList($rowType),
+                            ]);
                     }
                 }
             }
         }
+
+        if ($methodName === 'fetchcolumn') {
+            return new Type\Union([new Type\Atomic\TString(), new Type\Atomic\TNull(), new Type\Atomic\TFalse()]);
+        }
+
+        if ($methodName === 'fetchall'
+            && isset($first_arg_type)
+            && $first_arg_type->getSingleIntLiteral()->value === PDO::FETCH_COLUMN
+        ) {
+            return new Type\Union([
+                new Type\Atomic\TList(
+                    new Type\Union([
+                        new Type\Atomic\TString(),
+                        new Type\Atomic\TNull(),
+                    ]),
+                ),
+            ]);
+        }
+
+        $parentReturnType = self::getMethodReturnType(
+            $pdoStatement,
+            'fetch',
+            $source,
+            $location,
+            $args
+        );
+
+        if (!$parentReturnType) {
+            return null;
+        }
+
+        $originalReturnTransformed = self::replaceScalarToStringInUnion($parentReturnType);
+
+        // fetchAll can't return false as array elements
+        if ($methodName === 'fetchall') {
+            $originalReturnTransformed->removeType('false');
+            $returnType = new Type\Union([
+                new Type\Atomic\TList($originalReturnTransformed),
+            ]);
+
+            return $returnType;
+        }
+
+        return $originalReturnTransformed;
     }
+
+    /**
+     * @param array<string, bool> $sqlOut
+     */
+    private static function getRowType(int $fetch_mode, array $sqlOut, ?int $column = null): ?Type\Union
+    {
+        $properties = [];
+        $columnIndex = 0;
+
+        foreach ($sqlOut as $key => $isNullable) {
+            $returnType = [new Type\Atomic\TString()];
+
+            if ($isNullable) {
+                $returnType[] = new Type\Atomic\TNull();
+            }
+
+            $columnType = new Type\Union($returnType);
+
+            if ($column !== null && $column === $columnIndex) {
+                return $columnType;
+            }
+
+            switch ($fetch_mode) {
+                case PDO::FETCH_ASSOC:
+                case PDO::FETCH_OBJ:
+                    $properties[$key] = $columnType;
+                    break;
+
+                case PDO::FETCH_BOTH:
+                    $properties[$key] = $columnType;
+                    $properties[$columnIndex] = $columnType;
+                    break;
+
+                case PDO::FETCH_NUM:
+                    $properties[$columnIndex] = $columnType;
+                    break;
+            }
+
+            $columnIndex++;
+        }
+
+        if (!empty($properties) && $column === null) {
+            if ($fetch_mode === PDO::FETCH_OBJ) {
+                return new Type\Union([new Type\Atomic\TObjectWithProperties($properties)]);
+            }
+            return new Type\Union([new Type\Atomic\TKeyedArray($properties)]);
+        }
+
+        return null;
+    }
+
+    protected static function replaceScalarToStringInUnion(Type\Union $union): Type\Union
+    {
+        $atomicTypes = $union->getAtomicTypes();
+        $unionTypes = [];
+
+        foreach ($atomicTypes as $type) {
+            $unionTypes[] = self::replaceAtomicToString($type);
+        }
+
+        $type = new Type\Union($unionTypes);
+
+        if ($type->equals(Type::getString())) {
+            $type->addType(new Type\Atomic\TNull());
+        }
+
+        return $type;
+    }
+
+    protected static function replaceAtomicToString(Type\Atomic $atomic): Type\Atomic
+    {
+        if ($atomic instanceof Type\Atomic\TScalar) {
+            return new Type\Atomic\TString();
+        }
+
+        if ($atomic instanceof Type\Atomic\TArray) {
+            $atomic->type_params[1] = self::replaceScalarToStringInUnion($atomic->type_params[1]);
+        }
+
+        if ($atomic instanceof Type\Atomic\TList) {
+            $atomic->type_param = self::replaceScalarToStringInUnion($atomic->type_param);
+        }
+
+        return $atomic;
+    }
+
 }

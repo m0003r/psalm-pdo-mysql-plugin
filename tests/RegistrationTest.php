@@ -42,6 +42,6 @@ class RegistrationTest extends TestCase
         $registration->addStubFile(Argument::any())->shouldBeCalled();
         $registration->registerHooksFromClass(Argument::any())->shouldBeCalled();
 
-        $plugin($registration->reveal(), (new \SimpleXMLElement('<databases><empty /></databases>')));
+        $plugin($registration->reveal(), (new \SimpleXMLElement('<config><databases><database name="empty" /></databases></config>')));
     }
 }

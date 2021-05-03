@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <databases>
+    <database name="test">
+        <table_structure name="test">
 
+        </table_structure>
+    </database>
+    <database name="test2">
+        <table_structure name="test">
+
+        </table_structure>
+    </database>
 </databases>

@@ -11,8 +11,14 @@ use M03r\PsalmPDOMySQL\Parser\SQLParser;
 use M03r\PsalmPDOMySQL\Types\TSqlSelectString;
 use PDO;
 use PhpMyAdmin\SqlParser\Exceptions\ParserException;
+use PhpParser\PrettyPrinter\Standard;
+use PhpParser\PrettyPrinterAbstract;
 use Psalm\Internal\Provider\ReturnTypeProvider\PdoStatementReturnTypeProvider;
 use Psalm\IssueBuffer;
+use Psalm\Plugin\EventHandler\AfterEveryFunctionCallAnalysisInterface;
+use Psalm\Plugin\EventHandler\AfterFunctionCallAnalysisInterface;
+use Psalm\Plugin\EventHandler\Event\AfterEveryFunctionCallAnalysisEvent;
+use Psalm\Plugin\EventHandler\Event\AfterFunctionCallAnalysisEvent;
 use Psalm\Plugin\EventHandler\Event\MethodReturnTypeProviderEvent;
 use Psalm\Plugin\EventHandler\MethodReturnTypeProviderInterface;
 use Psalm\Type;
@@ -20,45 +26,50 @@ use UnexpectedValueException;
 
 use function class_exists;
 
-class TypedPDOStatementFetchReturn implements MethodReturnTypeProviderInterface
+class FetchReturnProvider
 {
-    /**
-     * @param  ?array<Type\Union> $template_type_parameters
-     */
+    /** @inheritDoc */
+    public static function getClassLikeNames(): array
+    {
+        return [];
+    }
+
     public static function getMethodReturnType(MethodReturnTypeProviderEvent $event): ?Type\Union
     {
         if (!class_exists('PDO')) {
             return null;
         }
 
-        $method_name_lowercase = $event->getMethodNameLowercase();
+        $methodName = $event->getMethodNameLowercase();
         $source = $event->getSource();
-        $code_location = $event->getCodeLocation();
-        $call_args = $event->getCallArgs();
+        $location = $event->getCodeLocation();
+        $args = $event->getCallArgs();
+        $context = $event->getContext();
+
 
         $isSuitableMethod =
-            $method_name_lowercase === 'fetch'
-            || $method_name_lowercase === 'fetchall'
-            || $method_name_lowercase === 'fetchcolumn';
+            $methodName === 'fetch'
+            || $methodName === 'fetchall'
+            || $methodName === 'fetchcolumn';
 
         if (!$isSuitableMethod) {
             return null;
         }
 
-        $firstArgRequired = $method_name_lowercase !== 'fetchcolumn';
+        $firstArgRequired = $methodName !== 'fetchcolumn';
 
         // if first arg is set and it isn't single int literal, we can't do anything
         if (
-            isset($call_args[0]) &&
+            isset($args[0]) &&
             (
-                !($first_arg_type = $source->getNodeTypeProvider()->getType($call_args[0]->value)) ||
+                !($first_arg_type = $source->getNodeTypeProvider()->getType($args[0]->value)) ||
                 !$first_arg_type->isSingleIntLiteral())
         ) {
             return null;
         }
 
         // if it is required and
-        if ($firstArgRequired && !isset($call_args[0])) {
+        if ($firstArgRequired && !isset($args[0])) {
             return null;
         }
 
@@ -85,7 +96,7 @@ class TypedPDOStatementFetchReturn implements MethodReturnTypeProviderInterface
                     }
 
                     IssueBuffer::accepts(
-                        new SQLParserIssue($message, $code_location),
+                        new SQLParserIssue($message, $location),
                         $source->getSuppressedIssues()
                     );
                 }
@@ -94,15 +105,15 @@ class TypedPDOStatementFetchReturn implements MethodReturnTypeProviderInterface
 
         if (isset($first_arg_type)
             && ($fetch_mode = $first_arg_type->getSingleIntLiteral()->value) === PDO::FETCH_CLASS
-            && isset($call_args[1])
-            && ($second_arg_type = $source->getNodeTypeProvider()->getType($call_args[1]->value))
+            && isset($args[1])
+            && ($second_arg_type = $source->getNodeTypeProvider()->getType($args[1]->value))
             && ($second_arg_type->isSingleStringLiteral())
         ) {
             $class_name = $second_arg_type->getSingleStringLiteral()->value;
 
             if (!$source->getCodebase()->classOrInterfaceExists($class_name)) {
                 IssueBuffer::accepts(
-                    new PDOInvalidFetchClass("Class $class_name does not exists", $code_location),
+                    new PDOInvalidFetchClass("Class $class_name does not exists", $location),
                     $source->getSuppressedIssues()
                 );
             }
@@ -112,7 +123,7 @@ class TypedPDOStatementFetchReturn implements MethodReturnTypeProviderInterface
                 new Type\Atomic\TFalse(),
             ]);
 
-            if ($method_name_lowercase === 'fetchall') {
+            if ($methodName === 'fetchall') {
                 $return_type->removeType('false');
                 $return_type = new Type\Union([
                     new Type\Atomic\TList($return_type),
@@ -125,11 +136,11 @@ class TypedPDOStatementFetchReturn implements MethodReturnTypeProviderInterface
         }
 
         if (is_array($sqlOut)) {
-            if ($method_name_lowercase === 'fetchcolumn') {
+            if ($methodName === 'fetchcolumn') {
                 $returnType = self::getRowType(
                     PDO::FETCH_COLUMN,
                     $sqlOut,
-                    isset($call_args[0]) ? $first_arg_type->getSingleIntLiteral()->value : 0
+                    isset($args[0]) ? $first_arg_type->getSingleIntLiteral()->value : 0
                 );
 
                 if ($returnType) {
@@ -144,9 +155,10 @@ class TypedPDOStatementFetchReturn implements MethodReturnTypeProviderInterface
                 $rowType = null;
                 $fetch_mode = $first_arg_type->getSingleIntLiteral()->value;
 
-                if ($fetch_mode === PDO::FETCH_ASSOC ||
-                    $fetch_mode === PDO::FETCH_BOTH ||
-                    $fetch_mode === PDO::FETCH_NUM
+                if ($fetch_mode === PDO::FETCH_ASSOC
+                    || $fetch_mode === PDO::FETCH_BOTH
+                    || $fetch_mode === PDO::FETCH_NUM
+                    || $fetch_mode === PDO::FETCH_OBJ
                 ) {
                     $rowType = self::getRowType($fetch_mode, $sqlOut);
                 } elseif ($fetch_mode === PDO::FETCH_COLUMN) {
@@ -154,7 +166,7 @@ class TypedPDOStatementFetchReturn implements MethodReturnTypeProviderInterface
                 }
 
                 if ($rowType !== null) {
-                    switch ($method_name_lowercase) {
+                    switch ($methodName) {
                         case 'fetch':
                             if (!$isAggregating) {
                                 $rowType->addType(new Type\Atomic\TFalse());
@@ -173,11 +185,11 @@ class TypedPDOStatementFetchReturn implements MethodReturnTypeProviderInterface
             }
         }
 
-        if ($method_name_lowercase === 'fetchcolumn') {
+        if ($methodName === 'fetchcolumn') {
             return new Type\Union([new Type\Atomic\TString(), new Type\Atomic\TNull(), new Type\Atomic\TFalse()]);
         }
 
-        if ($method_name_lowercase === 'fetchall'
+        if ($methodName === 'fetchall'
             && isset($first_arg_type)
             && $first_arg_type->getSingleIntLiteral()->value === PDO::FETCH_COLUMN
         ) {
@@ -212,7 +224,7 @@ class TypedPDOStatementFetchReturn implements MethodReturnTypeProviderInterface
         $originalReturnTransformed = self::replaceScalarToStringInUnion($parentReturnType);
 
         // fetchAll can't return false as array elements
-        if ($method_name_lowercase === 'fetchall') {
+        if ($methodName === 'fetchall') {
             $originalReturnTransformed->removeType('false');
             $returnType = new Type\Union([
                 new Type\Atomic\TList($originalReturnTransformed),
@@ -223,7 +235,6 @@ class TypedPDOStatementFetchReturn implements MethodReturnTypeProviderInterface
 
         return $originalReturnTransformed;
     }
-
 
     /**
      * @param array<string, bool> $sqlOut
@@ -248,6 +259,7 @@ class TypedPDOStatementFetchReturn implements MethodReturnTypeProviderInterface
 
             switch ($fetch_mode) {
                 case PDO::FETCH_ASSOC:
+                case PDO::FETCH_OBJ:
                     $properties[$key] = $columnType;
                     break;
 
@@ -265,6 +277,9 @@ class TypedPDOStatementFetchReturn implements MethodReturnTypeProviderInterface
         }
 
         if (!empty($properties) && $column === null) {
+            if ($fetch_mode === PDO::FETCH_OBJ) {
+                return new Type\Union([new Type\Atomic\TObjectWithProperties($properties)]);
+            }
             return new Type\Union([new Type\Atomic\TKeyedArray($properties)]);
         }
 
@@ -287,12 +302,6 @@ class TypedPDOStatementFetchReturn implements MethodReturnTypeProviderInterface
         }
 
         return $type;
-    }
-
-    /** @inheritDoc */
-    public static function getClassLikeNames(): array
-    {
-        return ['_psalm_mysql_plugin\\PDOStatement'];
     }
 
     protected static function replaceAtomicToString(Type\Atomic $atomic): Type\Atomic

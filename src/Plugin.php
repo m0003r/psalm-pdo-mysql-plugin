@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace M03r\PsalmPDOMySQL;
 
 use M03r\PsalmPDOMySQL\Hooks\FetchChecker;
-use M03r\PsalmPDOMySQL\Hooks\PDOPrepareReturnType;
-use M03r\PsalmPDOMySQL\Hooks\TypedPDOStatementFetchReturn;
+use M03r\PsalmPDOMySQL\Hooks\PDOMethodsReturnType;
+use M03r\PsalmPDOMySQL\Hooks\FetchReturnProvider;
 use Psalm\Plugin\PluginEntryPointInterface;
 use Psalm\Plugin\RegistrationInterface;
 use SimpleXMLElement;
@@ -22,15 +22,14 @@ class Plugin implements PluginEntryPointInterface
 
         Parser\SQLParser::loadDatabaseDescription($config->databases);
 
-        $registration->addStubFile(__DIR__ . '/Stubs/TypedPDOStatement.php');
+        $registration->addStubFile(__DIR__ . '/Stubs/PDOStatement.php');
 
-
-        class_exists(PDOPrepareReturnType::class, true);
-        class_exists(TypedPDOStatementFetchReturn::class, true);
+        class_exists(PDOMethodsReturnType::class, true);
+        class_exists(FetchReturnProvider::class, true);
         class_exists(FetchChecker::class, true);
 
-        $registration->registerHooksFromClass(PDOPrepareReturnType::class);
-        $registration->registerHooksFromClass(TypedPDOStatementFetchReturn::class);
+        $registration->registerHooksFromClass(PDOMethodsReturnType::class);
+        $registration->registerHooksFromClass(FetchReturnProvider::class);
         $registration->registerHooksFromClass(FetchChecker::class);
     }
 }

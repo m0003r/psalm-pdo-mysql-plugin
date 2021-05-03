@@ -256,11 +256,17 @@ class SQLParser
 
     public static function loadDatabaseDescription(\SimpleXMLElement $databases): void
     {
-        foreach ($databases as $database) {
+        if (!is_countable($databases->database) || count($databases->database) === 0) {
+            throw new \UnexpectedValueException("No databases configured");
+        }
+
+        foreach ($databases->database as $database) {
             $databaseName = (string)$database['name'];
+            self::$databases[$databaseName] = [];
 
             foreach ($database->table_structure as $table) {
                 $tableName = (string)$table['name'];
+                self::$databases[$databaseName][$tableName] = [];
 
                 foreach ($table->field as $field) {
                     $fieldName = (string)$field['Field'];
