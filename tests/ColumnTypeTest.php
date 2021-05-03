@@ -15,7 +15,7 @@ class ColumnTypeTest extends TestCase
     public function testColumnDefinition(string $type, bool $nullable, string $expectedId): void
     {
         $columnType = new ColumnType($type, $nullable);
-        $this->assertEquals($expectedId, $columnType->type->getId());
+        self::assertEquals($expectedId, $columnType->type->getId());
     }
 
     /**
@@ -27,6 +27,8 @@ class ColumnTypeTest extends TestCase
             'varchar' => ['varchar', false, 'string'],
             'int' => ['int', false, 'numeric-string'],
             'enum' => ["enum('A', 'B', 'C')", true, '"A"|"B"|"C"|null'],
+            'emptyEnum' => ["enum()", false, '""'],
+            'null' => ["NULL", true, 'null'],
         ];
     }
 }

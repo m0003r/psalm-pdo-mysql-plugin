@@ -23,6 +23,7 @@ use Psalm\Plugin\EventHandler\AfterMethodCallAnalysisInterface;
 use Psalm\Plugin\EventHandler\Event\AfterMethodCallAnalysisEvent;
 use Psalm\StatementsSource;
 use Psalm\Type;
+use Psalm\Type\Union;
 use UnexpectedValueException;
 
 class FetchChecker implements AfterMethodCallAnalysisInterface
@@ -43,6 +44,11 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
         }
 
         $var_id = ExpressionIdentifier::getVarId($expr->var, null, $statements_source);
+
+        if (!$var_id) {
+            return;
+        }
+
         $sourceType = $context->vars_in_scope[$var_id] ?? null;
 
         if (!$sourceType) {
@@ -50,7 +56,7 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
         }
 
         /** @var ?TPDOStatement $pdoStatement */
-            $pdoStatement = $sourceType->getAtomicTypes()['PDOStatement'] ?? null;
+        $pdoStatement = $sourceType->getAtomicTypes()['PDOStatement'] ?? null;
 
         if (!$pdoStatement) {
             return;
@@ -130,8 +136,7 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
         $firstArgRequired = $methodName !== 'fetchcolumn';
 
         // if first arg is set and it isn't single int literal, we can't do anything
-        if (
-            isset($args[0]) &&
+        if (isset($args[0]) &&
             (
                 !($first_arg_type = $source->getNodeTypeProvider()->getType($args[0]->value)) ||
                 !$first_arg_type->isSingleIntLiteral())
@@ -144,11 +149,11 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
             return null;
         }
 
-        $sqlOut = null;
-        $isAggregating = false;
+        /** @var Union|void $first_arg_type */
 
-        if ($pdoStatement->sqlString instanceof TSqlSelectString
-        ) {
+        $sqlOut = null;
+
+        if ($pdoStatement->sqlString instanceof TSqlSelectString) {
             try {
                 $sqlOut = SQLParser::parseSQL($pdoStatement->sqlString->value);
             } catch (Exception $e) {
@@ -170,7 +175,7 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
         }
 
         if (isset($first_arg_type)
-            && ($fetch_mode = $first_arg_type->getSingleIntLiteral()->value) === PDO::FETCH_CLASS
+            && ($first_arg_type->getSingleIntLiteral()->value) === PDO::FETCH_CLASS
             && isset($args[1])
             && ($second_arg_type = $source->getNodeTypeProvider()->getType($args[1]->value))
             && ($second_arg_type->isSingleStringLiteral())
@@ -210,7 +215,7 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
                 );
 
                 if ($returnType) {
-                    if (!$isAggregating && !$pdoStatement->hasRows) {
+                    if (!$pdoStatement->hasRows) {
                         $returnType->addType(new Type\Atomic\TFalse());
                     }
 
@@ -234,7 +239,7 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
                 if ($rowType !== null) {
                     switch ($methodName) {
                         case 'fetch':
-                            if (!$isAggregating && !$pdoStatement->hasRows) {
+                            if (!$pdoStatement->hasRows) {
                                 $rowType->addType(new Type\Atomic\TFalse());
                             }
 
@@ -242,7 +247,7 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
 
                         case 'fetchall':
                             return new Type\Union([
-                                $isAggregating || $pdoStatement->hasRows ?
+                                $pdoStatement->hasRows ?
                                     new Type\Atomic\TNonEmptyList($rowType) :
                                     new Type\Atomic\TList($rowType),
                             ]);
@@ -297,22 +302,14 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
     }
 
     /**
-     * @param array<string, bool> $sqlOut
+     * @param array<string, Union> $sqlOut
      */
     private static function getRowType(int $fetch_mode, array $sqlOut, ?int $column = null): ?Type\Union
     {
         $properties = [];
         $columnIndex = 0;
 
-        foreach ($sqlOut as $key => $isNullable) {
-            $returnType = [new Type\Atomic\TString()];
-
-            if ($isNullable) {
-                $returnType[] = new Type\Atomic\TNull();
-            }
-
-            $columnType = new Type\Union($returnType);
-
+        foreach ($sqlOut as $key => $columnType) {
             if ($column !== null && $column === $columnIndex) {
                 return $columnType;
             }
@@ -347,7 +344,7 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
         return null;
     }
 
-    protected static function replaceScalarToStringInUnion(Type\Union $union): Type\Union
+    private static function replaceScalarToStringInUnion(Type\Union $union): Type\Union
     {
         $atomicTypes = $union->getAtomicTypes();
         $unionTypes = [];
@@ -365,7 +362,7 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
         return $type;
     }
 
-    protected static function replaceAtomicToString(Type\Atomic $atomic): Type\Atomic
+    private static function replaceAtomicToString(Type\Atomic $atomic): Type\Atomic
     {
         if ($atomic instanceof Type\Atomic\TScalar) {
             return new Type\Atomic\TString();

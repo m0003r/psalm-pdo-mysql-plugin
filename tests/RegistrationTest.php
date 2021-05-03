@@ -10,7 +10,11 @@ use Prophecy\Argument;
 use Prophecy\PhpUnit\ProphecyTrait;
 use Psalm\Plugin\RegistrationInterface;
 use SimpleXMLElement;
+use UnexpectedValueException;
 
+/**
+ * @covers \M03r\PsalmPDOMySQL\Plugin
+ */
 class RegistrationTest extends TestCase
 {
     use ProphecyTrait;
@@ -37,6 +41,19 @@ class RegistrationTest extends TestCase
         $plugin($registration->reveal(), $config);
     }
 
+    public function testItShouldRegisterWithoutDatabases(): void
+    {
+        $plugin = new Plugin();
+        $registration = $this->prophesize(RegistrationInterface::class);
+        $registration->addStubFile()->shouldNotBeCalled();
+        $registration->registerHooksFromClass()->shouldNotBeCalled();
+
+        $this->expectException(UnexpectedValueException::class);
+        $plugin($registration->reveal(), (
+            new SimpleXMLElement(
+                '<config><databases /></config>'
+            )));
+    }
     public function testItShouldRegisterWithProperConfig(): void
     {
         $plugin = new Plugin();

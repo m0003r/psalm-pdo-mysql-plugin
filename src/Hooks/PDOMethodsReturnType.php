@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace M03r\PsalmPDOMySQL\Hooks;
 
 use M03r\PsalmPDOMySQL\Types\SQLStringProvider;
+use M03r\PsalmPDOMySQL\Types\StringExtractor;
 use M03r\PsalmPDOMySQL\Types\TPDOStatement;
 use M03r\PsalmPDOMySQL\Types\TSqlSelectString;
 use PhpParser\Node;
@@ -45,7 +46,10 @@ class PDOMethodsReturnType implements MethodReturnTypeProviderInterface
         if ($first_arg_type && $first_arg_type->hasLiteralString()) {
             $literalStrings = $first_arg_type->getLiteralStrings();
             $literal = SQLStringProvider::getTypeFromValue(reset($literalStrings)->value);
-            $partial = false;
+
+            if ($literal) {
+                $literal->partial = false;
+            }
         } elseif ($argValue instanceof Node\Expr\BinaryOp\Concat
             || $argValue instanceof Node\Scalar\Encapsed
         ) {
@@ -56,7 +60,10 @@ class PDOMethodsReturnType implements MethodReturnTypeProviderInterface
             $traverser->traverse([$argValue]);
 
             $literal = SQLStringProvider::getTypeFromValue($stringExtractor->result);
-            $partial = true;
+
+            if ($literal) {
+                $literal->partial = true;
+            }
         }
 
         $namedObject = new TPDOStatement('PDOStatement');
@@ -68,8 +75,6 @@ class PDOMethodsReturnType implements MethodReturnTypeProviderInterface
         if ($literal instanceof TSqlSelectString) {
             $namedObject->sqlString = $literal;
         }
-
-        $literal->partial = $partial;
 
         return new Type\Union([$namedObject]);
     }

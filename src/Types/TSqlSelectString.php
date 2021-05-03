@@ -8,6 +8,7 @@ use Psalm\Type\Atomic\TLiteralString;
 
 class TSqlSelectString extends TLiteralString
 {
+    /** @var bool */
     public $partial = true;
 
     public function getKey(bool $include_extra = true): string

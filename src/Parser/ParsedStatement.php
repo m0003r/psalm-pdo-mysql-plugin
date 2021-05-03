@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace M03r\PsalmPDOMySQL\Parser;
 
-use Exception;
 use PhpMyAdmin\SqlParser\Components\Expression;
 use PhpMyAdmin\SqlParser\Lexer;
 use PhpMyAdmin\SqlParser\Parser;
@@ -46,14 +45,14 @@ class ParsedStatement
 
             $this->parseFrom();
             $this->parseJoin();
-        } catch (Exception $e) {
+        } catch (UnexpectedValueException $e) {
             throw new RuntimeException('Error parsing query ' . $query, (int)$e->getCode(), $e);
         }
     }
 
     /**
      */
-    protected function parseSelect(string $query): SelectStatement
+    private function parseSelect(string $query): SelectStatement
     {
         $parser = new Parser($query);
         $select = $parser->statements[0] ?? null;
@@ -63,20 +62,20 @@ class ParsedStatement
         }
 
         foreach ($parser->errors as $error) {
-            throw $error;
+            throw new UnexpectedValueException("Error from SQL Parser", (int)$error->getCode(), $error);
         }
 
         return $select;
     }
 
-    protected function parseFrom(): void
+    private function parseFrom(): void
     {
         foreach ($this->stmt->from as $from) {
             $this->addTableLikeExpression($from);
         }
     }
 
-    protected function addTableLikeExpression(Expression $expr): void
+    private function addTableLikeExpression(Expression $expr): void
     {
         if (self::isTable($expr)) {
             $this->addTable($expr);
@@ -91,15 +90,17 @@ class ParsedStatement
         throw new UnexpectedValueException('Table or subselect expected!');
     }
 
-    /**
-     */
-    protected static function isTable(Expression $expr): bool
+    private static function isTable(Expression $expr): bool
     {
         return $expr->table && !$expr->column && !$expr->function && !$expr->subquery;
     }
 
-    protected function addTable(Expression $expr): void
+    private function addTable(Expression $expr): void
     {
+        if (!$expr->table) {
+            throw new UnexpectedValueException('Can\'t add empty table');
+        }
+
         $table = $expr->table;
         $alias = $expr->alias ?? $expr->table;
 
@@ -110,7 +111,7 @@ class ParsedStatement
                 $table = strtolower($table);
             }
         } else {
-            $this->allUnprefixedTables[$expr->table] = true;
+            $this->allUnprefixedTables[$table] = true;
         }
 
         $this->aliases[$alias] = $table;
@@ -118,15 +119,19 @@ class ParsedStatement
 
     /**
      */
-    protected static function isSubquery(Expression $expr): bool
+    private static function isSubquery(Expression $expr): bool
     {
         return (bool)$expr->subquery;
     }
 
-    protected function addSubquery(Expression $expr): void
+    private function addSubquery(Expression $expr): void
     {
         $subquery = self::extractSubquery($expr);
         $alias = $expr->alias;
+
+        if (!$alias) {
+            throw new UnexpectedValueException('Can\'t add subquery without alias');
+        }
 
         $parsedSubselect = new self($subquery, $this->aliases);
         $this->aliases[$alias] = $parsedSubselect;
@@ -136,7 +141,7 @@ class ParsedStatement
         }
     }
 
-    protected static function extractSubquery(Expression $expr): string
+    private static function extractSubquery(Expression $expr): string
     {
         // мы собираемся начать захватывать токены тогда, когда
         // встретим начало подзапроса (извлекается из $expr->subquery, по идее
@@ -146,17 +151,19 @@ class ParsedStatement
         // т.е. в подзапросе вида EXISTS(SELECT .... ) извлечение начнётся при
         // токене SELECT и закончится перед закрывающей его скобкой
 
+        /** @var string $expr->expr */
         $tokenList = Lexer::getTokens($expr->expr);
         $capture = false;
         $out = [];
-        $brackets = null;
+        /** @var int $brackets */
+        $brackets = 0;
 
+        /** @var Token $token */
         foreach ($tokenList->tokens as $token) {
             // начинаем захватывать
             if (!$capture) {
                 if ($token->value === $expr->subquery) {
                     $capture = true;
-                    $brackets = 0;
                 } else {
                     continue;
                 }
@@ -171,7 +178,7 @@ class ParsedStatement
                 $brackets--;
             }
 
-            $out[] = $token->value;
+            $out[] = (string)$token->value;
 
             if ($token->type === Token::TYPE_OPERATOR && $token->value === '(') {
                 $brackets++;
@@ -185,11 +192,12 @@ class ParsedStatement
         return implode($out);
     }
 
-    protected function parseJoin(): void
+    private function parseJoin(): void
     {
         if ($this->stmt->join) {
             foreach ($this->stmt->join as $join) {
                 $this->addTableLikeExpression($join->expr);
+                /** @var string $alias */
                 $alias = $join->expr->alias ?? $join->expr->table;
 
                 switch (strtolower($join->type)) {

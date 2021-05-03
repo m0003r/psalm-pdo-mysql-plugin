@@ -76,8 +76,6 @@ class ColumnType
 
     public function __clone()
     {
-        $newType = new ColumnType();
-        $newType->type = clone $this->type;
-        return $newType;
+        $this->type = clone $this->type;
     }
 }

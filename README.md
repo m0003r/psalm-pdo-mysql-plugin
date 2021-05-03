@@ -6,7 +6,7 @@ Usage example
 Database:
 ```sql
 CREATE TABLE `users` (
-    `id` INT UNSINGED NOT NULL AUTO_INCREMENT,
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `username` VARCHAR(255) NOT NULL,
     `email` VARCHAR(255),
     PRIMARY KEY (`id`)
