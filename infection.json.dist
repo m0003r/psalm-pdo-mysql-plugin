@@ -1,0 +1,13 @@
+{
+    "source": {
+        "directories": [
+            "src/Parser"
+        ]
+    },
+    "logs": {
+        "text": ".build/infection"
+    },
+    "mutators": {
+        "@default": true
+    }
+}

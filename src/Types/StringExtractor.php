@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace M03r\PsalmPDOMySQL\Hooks;
+namespace M03r\PsalmPDOMySQL\Types;
 
 use PhpParser\Node;
 use PhpParser\NodeTraverser;

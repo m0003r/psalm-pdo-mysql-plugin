@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <databases>
     <database name="test">
-        <table_structure name="test">
-
+        <table_structure name="basic_types">
+            <field Field="t_enumABC" Null="false" Type="ENUM('A', 'B', 'C')" />
+            <field Field="t_varchar" Null="false" Type="varchar" />
+            <field Field="t_char" Null="false" Type="char" />
+            <field Field="t_text" Null="false" Type="text" />
+            <field Field="t_int" Null="false" Type="decimal" />
+            <field Field="t_float" Null="false" Type="float" />
         </table_structure>
     </database>
     <database name="test2">

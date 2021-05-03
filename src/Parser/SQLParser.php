@@ -5,23 +5,26 @@ declare(strict_types=1);
 namespace M03r\PsalmPDOMySQL\Parser;
 
 use PhpMyAdmin\SqlParser\Components\Expression;
+use Psalm\Type\Union;
 use SimpleXMLElement;
 use UnexpectedValueException;
 
+/**
+ * @psalm-type TableDescription array<string, array<string, ColumnType>>
+ */
 class SQLParser
 {
-    /** @var array<string, array<string, array<string, bool>>> */
+    /** @var array<string, TableDescription> */
     public static $databases;
 
     /**
-     * @return array<string, bool>|null List of arguments with nullable flag or null if it can't be parsed
+     * @return array<string, Union>|null List of arguments with nullable flag or null if it can't be parsed
      */
     public static function parseSQL(string $query): ?array
     {
         $parsedStatement = new ParsedStatement($query);
 
-        // выясняем, к какой базе относится запрос
-        // ища все таблицы без баз в справочнике
+        // let's figure out which database we are currently querying
         $unprefixedTables = array_keys($parsedStatement->allUnprefixedTables);
         $unprefixedDatabase = null;
 
@@ -34,7 +37,7 @@ class SQLParser
             }
         }
 
-        // увы
+        // alas
         if ($unprefixedDatabase === null) {
             return null;
         }
@@ -45,21 +48,24 @@ class SQLParser
             return null;
         }
 
-        return $columns;
+        return array_map(static function (ColumnType $columnType): Union {
+            return $columnType->type;
+        }, $columns);
     }
 
     /**
-     * @return array<string, boolean>
+     * @return array<string, ColumnType>
      */
     protected static function getColumns(ParsedStatement $parsedStatement, string $unprefixedDatabase): array
     {
-        // сначала выпиываем все алиасы таблиц из этого запроса
+        // get all table aliases
+        /** @var array<string, array<string, ColumnType>> $aliasedTables */
         $aliasedTables = [];
 
-        foreach ($parsedStatement->aliases as $alias => $table) {
-            if (is_string($table)) {
-                // ищем базу
-                $exploded = explode('.', $table, 2);
+        foreach ($parsedStatement->aliases as $alias => $tableOrSubquery) {
+            if (is_string($tableOrSubquery)) {
+                // look up database name
+                $exploded = explode('.', $tableOrSubquery, 2);
 
                 if (count($exploded) < 2) {
                     array_unshift($exploded, $unprefixedDatabase);
@@ -67,7 +73,7 @@ class SQLParser
 
                 [$databaseName, $tableName] = $exploded;
 
-                // ищем таблицу в справочнике
+                // look for table description
                 if (!isset(self::$databases[$databaseName][$tableName])) {
                     throw new UnexpectedValueException("Table '$tableName' not found in '$databaseName'");
                 }
@@ -76,25 +82,28 @@ class SQLParser
                 continue;
             }
 
-            // а если это подзапрос, то используем волшебную рекурсию
-            $aliasedTables[$alias] = self::getColumns($table, $unprefixedDatabase);
+            // use recursion for subquery
+            $aliasedTables[$alias] = self::getColumns($tableOrSubquery, $unprefixedDatabase);
         }
 
         foreach ($aliasedTables as $alias => $data) {
-            // если эта таблица присоеднияется left join'ом
-            // или в выражении есть right join, и это не он
+            // if table is left joined or something else is right joined, then it values are always nullable
             if (isset($parsedStatement->leftJoins[$alias])
                 || (count($parsedStatement->rightJoins) > 0 && !isset($parsedStatement->rightJoins[$alias]))
             ) {
-                $aliasedTables[$alias] = array_fill_keys(array_keys($data), true);
+                foreach ($data as $columnName => $type) {
+                    $aliasedTables[$alias][$columnName] = clone $type;
+                    $aliasedTables[$alias][$columnName]->addNullable();
+                }
             }
         }
 
+        /** @var array<string, ColumnType> $outColumns */
         $outColumns = [];
 
-        // и для каждого выбираемого выражения
+        // for each selected expression
         foreach ($parsedStatement->stmt->expr as $expr) {
-            // особый случай, всё из всего
+            // special case
             if ($expr->expr === '*') {
                 foreach ($aliasedTables as $table) {
                     $columnLowerCaseAdded = [];
@@ -112,27 +121,27 @@ class SQLParser
                 continue;
             }
 
-            // всё из таблицы
-            if ($expr->table !== null && substr($expr->expr, -1) === '*') {
+            // all from specific table
+            if ($expr->table !== null && $expr->expr && substr($expr->expr, -1) === '*') {
                 if (!isset($aliasedTables[$expr->table])) {
                     throw new UnexpectedValueException("Can't find table '{$expr->table}'");
                 }
 
                 $columnLowerCaseAdded = [];
 
-                foreach ($aliasedTables[$expr->table] as $column => $nullable) {
+                foreach ($aliasedTables[$expr->table] as $column => $columnType) {
                     if (isset($columnLowerCaseAdded[$column])) {
                         continue;
                     }
 
                     $columnLowerCaseAdded[strtolower($column)] = true;
-                    $outColumns[$column] = $nullable;
+                    $outColumns[$column] = $columnType;
                 }
 
                 continue;
             }
 
-            self::fixExpression($expr);
+            self::fixAnsiQuotes($expr);
 
             if ($expr->column === null && $expr->expr !== null) {
                 if ($table = self::findColumnInTables($aliasedTables, $expr->expr)) {
@@ -142,48 +151,49 @@ class SQLParser
                 } else {
                     $nameFromAliasOrExpr = $expr->alias ?? $expr->expr;
 
-                    if ($expr->function === null) {
-                        if ($expr->subquery === null && $expr->expr !== 'NULL') {
-                            $outColumns[$nameFromAliasOrExpr] = false;
-                        } else {
-                            $outColumns[$nameFromAliasOrExpr] = true;
+                    if ($expr->function === null && $expr->subquery === null) {
+                        if ($expr->expr === 'NULL') {
+                            $outColumns[$nameFromAliasOrExpr] = new ColumnType('null');
+                            continue;
                         }
+                    }
 
+                    if ($expr->subquery !== null && strtoupper((string)$expr->function) !== 'EXISTS') {
+                        $outColumns[$nameFromAliasOrExpr] = new ColumnType();
                         continue;
                     }
 
-                    if ($expr->subquery !== null && strtoupper($expr->function) !== 'EXISTS') {
-                        $outColumns[$nameFromAliasOrExpr] = true;
-                        continue;
-                    }
-
-                    switch (strtoupper($expr->function)) {
+                    switch (strtoupper((string)$expr->function)) {
                         case 'COUNT':
                         case 'EXISTS':
-                            $outColumns[$nameFromAliasOrExpr] = false;
+                            $outColumns[$nameFromAliasOrExpr] = new ColumnType('int', false);
                             break;
 
                         case 'AVG':
                         case 'MIN':
                         case 'MAX':
                         case 'SUM':
-                            $outColumns[$nameFromAliasOrExpr] = true;
+                            $outColumns[$nameFromAliasOrExpr] = new ColumnType('int', true);
                             break;
 
                         default:
-                            $outColumns[$nameFromAliasOrExpr] = true;
+                            $outColumns[$nameFromAliasOrExpr] = new ColumnType();
                     }
 
                     continue;
                 }
             }
 
-            // выясняем имя
+            // get column name or alias
             $columnName = $expr->alias ?? $expr->column;
 
-            // если это функция или подзапрос, то они точно nullable
+            if (!$columnName) {
+                throw new UnexpectedValueException("\$expr->column and \$expr->alias is null in table (alias) '$expr->table'");
+            }
+
+            // other functions and subqueries is nullable
             if ($expr->function !== null || $expr->subquery !== null) {
-                $outColumns[$columnName] = true;
+                $outColumns[$columnName] = new ColumnType();
                 continue;
             }
 
@@ -205,8 +215,12 @@ class SQLParser
                 throw new UnexpectedValueException("Can't resolve table (alias) '$table'");
             }
 
-            if (!isset($aliasedTables[$table][strtolower($expr->column)])) {
+            if ($expr->column && !isset($aliasedTables[$table][strtolower($expr->column)])) {
                 throw new UnexpectedValueException("Can't find column '{$expr->column}' in table (alias) '$table'");
+            }
+
+            if (!$expr->column) {
+                throw new UnexpectedValueException("\$expr->column is null in table (alias) '$table'");
             }
 
             // и присваиваем флаг nullable такой же, как в справочнике
@@ -218,7 +232,7 @@ class SQLParser
 
     /**
      */
-    protected static function fixExpression(Expression $expr): void
+    protected static function fixAnsiQuotes(Expression $expr): void
     {
         // workaround ANSI_QUOTES
         // SELECT "test" a
@@ -238,7 +252,7 @@ class SQLParser
     }
 
     /**
-     * @param array<string, array<string, bool>> $aliasedTables
+     * @param TableDescription $aliasedTables
      */
     protected static function findColumnInTables(array $aliasedTables, ?string $column): ?string
     {
@@ -257,29 +271,34 @@ class SQLParser
 
     public static function loadDatabaseDescription(SimpleXMLElement $databases): void
     {
-        if (!is_countable($databases->database) || count($databases->database) === 0) {
+        if (!$databases->database instanceof SimpleXMLElement || count($databases->database) === 0) {
             throw new UnexpectedValueException("No databases configured");
         }
 
+        /** @var SimpleXMLElement $database */
         foreach ($databases->database as $database) {
             $databaseName = (string)$database['name'];
             self::$databases[$databaseName] = [];
 
+            /** @var SimpleXMLElement $table */
             foreach ($database->table_structure as $table) {
                 $tableName = (string)$table['name'];
                 self::$databases[$databaseName][$tableName] = [];
 
+                /** @var SimpleXMLElement $field */
                 foreach ($table->field as $field) {
                     $fieldName = (string)$field['Field'];
                     $nullable = (string)$field['Null'] === 'YES';
+                    $type = (string)$field['Type'];
 
                     if (strtolower($databaseName) === 'information_schema') {
                         $databaseName = strtolower($databaseName);
                         $tableName = strtolower($tableName);
                     }
 
-                    self::$databases[$databaseName][$tableName][$fieldName] = $nullable;
-                    self::$databases[$databaseName][$tableName][strtolower($fieldName)] = $nullable;
+                    self::$databases[$databaseName][$tableName][$fieldName]
+                        = self::$databases[$databaseName][$tableName][strtolower($fieldName)]
+                        = new ColumnType($type, $nullable);
                 }
             }
         }

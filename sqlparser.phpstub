@@ -1,0 +1,23 @@
+<?php
+
+namespace PhpMyAdmin\SqlParser\Components {
+    class Expression {
+        /** @var ?string */
+        public $database;
+
+        /** @var ?string */
+        public $table;
+
+        /** @var ?string */
+        public $expr;
+
+        /** @var ?string */
+        public $column;
+
+        /** @var ?string */
+        public $alias;
+
+        /** @var ?string */
+        public $subquery;
+    }
+}

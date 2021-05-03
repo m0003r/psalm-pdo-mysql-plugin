@@ -59,7 +59,7 @@ class ParsedStatement
         $select = $parser->statements[0] ?? null;
 
         if (!$select instanceof SelectStatement) {
-            throw new UnexpectedValueException("Subselect $query must be parsed to SelectStatement");
+            throw new UnexpectedValueException("Subselect $query should have been parsed to SelectStatement");
         }
 
         foreach ($parser->errors as $error) {
@@ -88,7 +88,7 @@ class ParsedStatement
             return;
         }
 
-        throw new UnexpectedValueException('Should be table or subselect!');
+        throw new UnexpectedValueException('Table or subselect expected!');
     }
 
     /**

@@ -15,6 +15,10 @@
 
     </projectFiles>
 
+    <stubs>
+        <file name="sqlparser.phpstub"/>
+    </stubs>
+
     <plugins>
         <pluginClass class="Psalm\PhpUnitPlugin\Plugin" />
     </plugins>
