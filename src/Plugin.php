@@ -21,10 +21,17 @@ class Plugin implements PluginEntryPointInterface
 
         Parser\SQLParser::loadDatabaseDescription($config->databases);
 
-        $registration->addStubFile(__DIR__ . '/Stubs/PDOStatement.php');
-
         class_exists(PDOMethodsReturnType::class, true);
         class_exists(FetchChecker::class, true);
+
+
+        if ($config->PDOClass instanceof SimpleXMLElement) {
+            foreach ($config->PDOClass as $item) {
+                PDOMethodsReturnType::$additionalPDOClasses[] = (string)$item;
+            }
+        }
+
+        $registration->addStubFile(__DIR__ . '/Stubs/PDOStatement.php');
 
         $registration->registerHooksFromClass(PDOMethodsReturnType::class);
         $registration->registerHooksFromClass(FetchChecker::class);

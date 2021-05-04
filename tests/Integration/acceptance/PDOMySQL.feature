@@ -14,6 +14,8 @@ Feature: PDOMySQL
         <plugins>
           <pluginClass class="M03r\PsalmPDOMySQL\Plugin">
             <xi:include href="../../tests/Integration/_data/databases.xml" />
+            <PDOClass>PDOInterface</PDOClass>
+            <PDOClass>Deep\NS\PDOInterface</PDOClass>
           </pluginClass>
         </plugins>
       </psalm>
@@ -23,34 +25,58 @@ Feature: PDOMySQL
     Given I have the following code
       """
 <?php
-function fetchAssoc(PDO $pdo): void {
-      $stmAssoc = $pdo->query('SELECT 1 as data');
-      if (!$stmAssoc->rowCount()) {
-          return;
+namespace Deep\NS {
+    interface PDOInterface {
+        public function query(string $query): \PDOStatement;
+    }
+}
+
+namespace {
+  interface PDOInterface {
+    public function query(string $query): PDOStatement;
+  }
+
+  /** @return array<numeric-string, string> */
+  function fetchAssoc(PDO $pdo): array {
+        $stmAssoc = $pdo->query('SELECT t_int, t_char as data FROM basic_types');
+        if (!$stmAssoc->rowCount()) {
+            return [];
+        }
+
+        $row = $stmAssoc->fetch(PDO::FETCH_ASSOC);
+        $arr = [];
+        $arr[$row['t_int']] = $row['data'];
+
+        return $arr;
+  }
+
+  /** @return array<numeric-string, string> */
+  function fetchNum(PDOInterface $pdo): array {
+      $stmNum = $pdo->query('SELECT t_int, t_char as data FROM basic_types');
+      if (!$stmNum->rowCount()) {
+          return [];
       }
 
-      $row = $stmAssoc->fetch(PDO::FETCH_ASSOC);
-      echo $row['data'];
-}
+      [$int, $data] = $stmNum->fetch(PDO::FETCH_NUM);
+      $arr = [];
+      $arr[$int] = $data;
 
-function fetchNum(PDO $pdo): void {
-    $stmNum = $pdo->query('SELECT 1 as data');
-    if (!$stmNum->rowCount()) {
-        return;
-    }
+      return $arr;
+  }
 
-    $row = $stmNum->fetch(PDO::FETCH_NUM);
-    echo $row[0];
-}
+  /** @return array<numeric-string, string> */
+  function fetchBoth(\Deep\NS\PDOInterface $pdo): array {
+      $stmBoth = $pdo->query('SELECT t_int, t_char as data FROM basic_types');
+      if (!$stmBoth->rowCount()) {
+          return [];
+      }
 
-function fetchBoth(PDO $pdo): void {
-    $stmBoth = $pdo->query('SELECT 1 as data');
-    if (!$stmBoth->rowCount()) {
-        return;
-    }
+      $row = $stmBoth->fetch(PDO::FETCH_BOTH);
+      $arr = [];
+      $arr[$row[0]] = $row['data'];
 
-    $row = $stmBoth->fetch(PDO::FETCH_BOTH);
-    assert($row[0] === $row['data']);
+      return $arr;
+  }
 }
 """
     When I run psalm
@@ -60,25 +86,82 @@ function fetchBoth(PDO $pdo): void {
     Given I have the following code
 """
 <?php
-function fetchAll(PDO $pdo): void {
-    $stmAll = $pdo->query('SELECT 1 as data');
+/** @return array<numeric-string, string> */
+function fetchAll(PDO $pdo): array {
+    $stmAll = $pdo->query('SELECT t_int, t_char `data` FROM basic_types');
     if (!$stmAll->rowCount()) {
-        return;
+        return [];
     }
 
     $rows = $stmAll->fetchAll(PDO::FETCH_BOTH);
-    assert($rows[0][0] === $rows[0]['data']);
+    $arr = [];
+    foreach ($rows as $row) {
+        $arr[$row[0]] = $row['data'];
+    }
+
+    return $arr;
 }
 
-function fetchObject(PDO $pdo): void {
-    $stmAllObj = $pdo->query('SELECT 1 as data');
+/** @return array<numeric-string, object{id: numeric-string, data: string}> */
+function fetchObject(PDO $pdo): array {
+    $stmAllObj = $pdo->query('SELECT t_int `id`, t_char `data` FROM basic_types');
     if (!$stmAllObj->rowCount()) {
-        return;
+        return [];
     }
 
     $rows = $stmAllObj->fetchAll(PDO::FETCH_OBJ);
-    echo $rows[0]->data;
+    $arr = [];
+    foreach ($rows as $obj) {
+        $arr[$obj->id] = $obj;
+    }
+
+    return $arr;
 }
+      """
+    When I run psalm
+    Then I see no errors
+
+  Scenario: Regular use with fetchColumn
+    Given I have the following code
+"""
+<?php
+
+function fetchColumn(PDO $pdo): bool {
+    $stmFC = $pdo->query('SELECT COUNT(t_int) FROM basic_types');
+    if (!$stmFC->rowCount()) {
+        return false;
+    }
+
+    return $stmFC->fetchColumn() > 5;
+}
+
+function fetchColumnMode(PDO $pdo): bool {
+    $stmFCM = $pdo->query('SELECT COUNT(t_int) FROM basic_types');
+    if (!$stmFCM->rowCount()) {
+        return false;
+    }
+
+    return $stmFCM->fetch(PDO::FETCH_COLUMN) > 5;
+}
+
+function fetchColumnNum(PDO $pdo): bool {
+    $stmFCN = $pdo->query('SELECT CONCAT(t_char), SUM(t_float) FROM basic_types');
+    if (!$stmFCN->rowCount()) {
+        return false;
+    }
+
+    return $stmFCN->fetchColumn(1) > 5;
+}
+
+function fetchColumnNumMode(PDO $pdo): bool {
+    $stmFCNM = $pdo->query('SELECT CONCAT(t_char), SUM(t_float) FROM basic_types');
+    if (!$stmFCNM->rowCount()) {
+        return false;
+    }
+
+    return $stmFCNM->fetch(PDO::FETCH_COLUMN, 1) > 5;
+}
+
       """
     When I run psalm
     Then I see no errors

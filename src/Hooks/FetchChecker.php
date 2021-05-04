@@ -234,7 +234,15 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
             ) {
                 $rowType = self::getRowType($fetch_mode, $sqlOut);
             } elseif ($fetch_mode === PDO::FETCH_COLUMN) {
-                $rowType = self::getRowType($fetch_mode, $sqlOut, 0);
+                $column = 0;
+
+                if (isset($args[1])
+                    && ($second_arg_type = $source->getNodeTypeProvider()->getType($args[1]->value))
+                    && $second_arg_type->isSingleIntLiteral()) {
+                    $column = $second_arg_type->getSingleIntLiteral()->value;
+                }
+
+                $rowType = self::getRowType($fetch_mode, $sqlOut, $column);
             }
 
             if ($rowType !== null) {

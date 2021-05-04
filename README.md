@@ -1,5 +1,15 @@
 This plugin let Psalm better understand MySQL `SELECT`'s, executed via PDO.
 
+Some assumptions
+====
+
+Plugin is developed initially for internal purpose, so there is some limitation. It assumes that PDO is configured as:
+- `PDO::ATTR_ERRMODE` is set to `PDO::ERRMODE_EXCEPTION`, so query can't return `false`
+- `PDO::ATTR_EMULATE_PREPARES` is set to `true`
+
+It can be configured later, also pull requests are always welcome :) 
+
+
 Usage example
 =====
 
@@ -55,6 +65,8 @@ Then add plugin configuration in `psalm.xml` as follows:
     <plugins>
         <pluginClass class="M03r\PsalmPDOMySQL\Plugin">
             <xi:include href="databases.xml" />
+            <!-- if you use PDO-like wrapper/interface -->
+            <PDOClass>App\Bundle\PDOInterface</PDOClass>
         </pluginClass>
         <!-- other plugins -->
     </plugins>

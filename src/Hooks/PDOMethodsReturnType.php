@@ -18,10 +18,13 @@ use function class_exists;
 
 class PDOMethodsReturnType implements MethodReturnTypeProviderInterface
 {
+    /** @var list<string> */
+    public static $additionalPDOClasses = [];
+
     /** @inheritDoc */
     public static function getClassLikeNames(): array
     {
-        return ['PDO'];
+        return array_unique(array_values(array_merge(['PDO'], self::$additionalPDOClasses)));
     }
 
     /** @inheritDoc */
