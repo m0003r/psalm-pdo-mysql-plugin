@@ -110,9 +110,11 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
 
             if ($method_id === 'PDOStatement::fetchall') {
                 $pdoStatement->hasRows = false;
-
-                $pdoStatement->syncToContext($context, $var_id);
+            } else {
+                $pdoStatement->hasRows = null;
             }
+
+            $pdoStatement->syncToContext($context, $var_id);
         }
     }
 

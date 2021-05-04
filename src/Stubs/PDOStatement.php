@@ -15,7 +15,7 @@ class PDOStatement
      * @psalm-assert-if-false true $this->__psalm_rowCountZero
      * @psalm-assert true $this->__psalm_rowCountFetched
      */
-    public function rowCount(): void
+    public function rowCount(): int
     {
     }
 
