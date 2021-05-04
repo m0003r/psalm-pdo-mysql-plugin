@@ -24,7 +24,6 @@ class Plugin implements PluginEntryPointInterface
         class_exists(PDOMethodsReturnType::class, true);
         class_exists(FetchChecker::class, true);
 
-
         if ($config->PDOClass instanceof SimpleXMLElement) {
             foreach ($config->PDOClass as $item) {
                 PDOMethodsReturnType::$additionalPDOClasses[] = (string)$item;

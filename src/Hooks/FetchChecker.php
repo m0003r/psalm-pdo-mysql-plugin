@@ -240,7 +240,8 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
 
                 if (isset($args[1])
                     && ($second_arg_type = $source->getNodeTypeProvider()->getType($args[1]->value))
-                    && $second_arg_type->isSingleIntLiteral()) {
+                    && $second_arg_type->isSingleIntLiteral()
+                ) {
                     $column = $second_arg_type->getSingleIntLiteral()->value;
                 }
 
