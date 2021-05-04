@@ -190,7 +190,7 @@ class SQLParser
             }
 
             // get column name or alias
-            $columnName = $expr->alias ?? $expr->column ?? $expr->expr;
+            $columnName = $expr->alias ?? $expr->column ?: $expr->expr;
 
             if (!$columnName) {
                 throw new UnexpectedValueException(
@@ -208,12 +208,12 @@ class SQLParser
             $table = $expr->table;
 
             if (!$table) {
-                $table = self::findColumnInTables($aliasedTables, $expr->column);
+                $table = self::findColumnInTables($aliasedTables, $expr->column ?: $expr->expr);
             }
 
             if (!$table) {
                 throw new UnexpectedValueException(
-                    "Can't find table for column '{$expr->column}' (tables: "
+                    "Can't find table for column '" . (string)($expr->column ?: $expr->expr) . "' in $expr (tables: "
                     . implode(
                         ', ',
                         array_keys($aliasedTables)

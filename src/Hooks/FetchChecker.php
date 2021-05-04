@@ -23,6 +23,9 @@ use Psalm\Plugin\EventHandler\AfterMethodCallAnalysisInterface;
 use Psalm\Plugin\EventHandler\Event\AfterMethodCallAnalysisEvent;
 use Psalm\StatementsSource;
 use Psalm\Type;
+use Psalm\Type\Atomic\TList;
+use Psalm\Type\Atomic\TNull;
+use Psalm\Type\Atomic\TString;
 use Psalm\Type\Union;
 use UnexpectedValueException;
 
@@ -55,10 +58,9 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
             return;
         }
 
-        /** @var ?TPDOStatement $pdoStatement */
         $pdoStatement = $sourceType->getAtomicTypes()['PDOStatement'] ?? null;
 
-        if (!$pdoStatement) {
+        if (!$pdoStatement instanceof TPDOStatement) {
             return;
         }
 
@@ -197,7 +199,7 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
             if ($methodName === 'fetchall') {
                 $return_type->removeType('false');
                 $return_type = new Type\Union([
-                    new Type\Atomic\TList($return_type),
+                    new TList($return_type),
                 ]);
 
                 return $return_type;
@@ -206,108 +208,94 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
             return $return_type;
         }
 
-        if (is_array($sqlOut)) {
-            if ($methodName === 'fetchcolumn') {
-                $returnType = self::getRowType(
-                    PDO::FETCH_COLUMN,
-                    $sqlOut,
-                    isset($args[0]) ? $first_arg_type->getSingleIntLiteral()->value : 0
-                );
+        if ($methodName === 'fetchcolumn') {
+            $returnType = self::getRowType(
+                PDO::FETCH_COLUMN,
+                $sqlOut,
+                isset($args[0]) ? $first_arg_type->getSingleIntLiteral()->value : 0
+            );
 
-                if ($returnType) {
-                    if (!$pdoStatement->hasRows) {
-                        $returnType->addType(new Type\Atomic\TFalse());
-                    }
-
-                    return $returnType;
-                }
-            } elseif (isset($first_arg_type)) {
-                // fetch or fetchall
-                $rowType = null;
-                $fetch_mode = $first_arg_type->getSingleIntLiteral()->value;
-
-                if ($fetch_mode === PDO::FETCH_ASSOC
-                    || $fetch_mode === PDO::FETCH_BOTH
-                    || $fetch_mode === PDO::FETCH_NUM
-                    || $fetch_mode === PDO::FETCH_OBJ
-                ) {
-                    $rowType = self::getRowType($fetch_mode, $sqlOut);
-                } elseif ($fetch_mode === PDO::FETCH_COLUMN) {
-                    $rowType = self::getRowType($fetch_mode, $sqlOut, 0);
+            if ($returnType) {
+                if (!$pdoStatement->hasRows) {
+                    $returnType->addType(new Type\Atomic\TFalse());
                 }
 
-                if ($rowType !== null) {
-                    switch ($methodName) {
-                        case 'fetch':
-                            if (!$pdoStatement->hasRows) {
-                                $rowType->addType(new Type\Atomic\TFalse());
-                            }
+                return $returnType;
+            }
+        } else {
+            // fetch or fetchall
+            $rowType = null;
+            $fetch_mode = isset($first_arg_type) ? $first_arg_type->getSingleIntLiteral()->value : PDO::FETCH_BOTH;
 
-                            return $rowType;
+            if ($fetch_mode === PDO::FETCH_ASSOC
+                || $fetch_mode === PDO::FETCH_BOTH
+                || $fetch_mode === PDO::FETCH_NUM
+                || $fetch_mode === PDO::FETCH_OBJ
+            ) {
+                $rowType = self::getRowType($fetch_mode, $sqlOut);
+            } elseif ($fetch_mode === PDO::FETCH_COLUMN) {
+                $rowType = self::getRowType($fetch_mode, $sqlOut, 0);
+            }
 
-                        case 'fetchall':
-                            return new Type\Union([
-                                $pdoStatement->hasRows ?
-                                    new Type\Atomic\TNonEmptyList($rowType) :
-                                    new Type\Atomic\TList($rowType),
-                            ]);
-                    }
+            if ($rowType !== null) {
+                switch ($methodName) {
+                    case 'fetch':
+                        if (!$pdoStatement->hasRows) {
+                            $rowType->addType(new Type\Atomic\TFalse());
+                        }
+
+                        return $rowType;
+
+                    case 'fetchall':
+                        return new Type\Union([
+                            $pdoStatement->hasRows ?
+                                new Type\Atomic\TNonEmptyList($rowType) :
+                                new TList($rowType),
+                        ]);
                 }
             }
         }
 
-        if ($methodName === 'fetchcolumn') {
-            return new Type\Union([new Type\Atomic\TString(), new Type\Atomic\TNull(), new Type\Atomic\TFalse()]);
-        }
-
-        if ($methodName === 'fetchall'
-            && isset($first_arg_type)
-            && $first_arg_type->getSingleIntLiteral()->value === PDO::FETCH_COLUMN
-        ) {
-            return new Type\Union([
-                new Type\Atomic\TList(
-                    new Type\Union([
-                        new Type\Atomic\TString(),
-                        new Type\Atomic\TNull(),
-                    ]),
-                ),
-            ]);
-        }
-
-        $parentReturnType = self::getMethodReturnType(
-            $pdoStatement,
-            'fetch',
-            $source,
-            $location,
-            $args
-        );
-
-        if (!$parentReturnType) {
-            return null;
-        }
-
-        $originalReturnTransformed = self::replaceScalarToStringInUnion($parentReturnType);
-
-        // fetchAll can't return false as array elements
-        if ($methodName === 'fetchall') {
-            $originalReturnTransformed->removeType('false');
-            $returnType = new Type\Union([
-                new Type\Atomic\TList($originalReturnTransformed),
-            ]);
-
-            return $returnType;
-        }
-
-        return $originalReturnTransformed;
+        return null;
     }
 
     /**
-     * @param array<string, Union> $sqlOut
+     * @param ?array<string, Union> $sqlOut
      */
-    private static function getRowType(int $fetch_mode, array $sqlOut, ?int $column = null): ?Type\Union
+    private static function getRowType(int $fetch_mode, ?array $sqlOut, ?int $column = null): ?Type\Union
     {
         $properties = [];
         $columnIndex = 0;
+
+        if (!$sqlOut) {
+            if ($fetch_mode === PDO::FETCH_COLUMN) {
+                return new Union([
+                    new TString(),
+                    new TNull(),
+                ]);
+            }
+
+            if ($fetch_mode === PDO::FETCH_NUM) {
+                return new Union([
+                    new TList(new Union([
+                            new TString(),
+                            new TNull(),
+                        ])),
+                ]);
+            }
+
+            return new Union([
+                new Type\Atomic\TArray([
+                    new Union([
+                        new Type\Atomic\TArrayKey(),
+                    ]),
+                    new Union([
+                        new TString(),
+                        new TNull(),
+                    ]),
+                ]),
+            ]);
+        }
 
         foreach ($sqlOut as $key => $columnType) {
             if ($column !== null && $column === $columnIndex) {
@@ -372,7 +360,7 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
             $atomic->type_params[1] = self::replaceScalarToStringInUnion($atomic->type_params[1]);
         }
 
-        if ($atomic instanceof Type\Atomic\TList) {
+        if ($atomic instanceof TList) {
             $atomic->type_param = self::replaceScalarToStringInUnion($atomic->type_param);
         }
 

@@ -2,6 +2,9 @@
   "name": "m03r/psalm-pdo-mysql-plugin",
   "type": "psalm-plugin",
   "description": "Let Psalm understand values, returned from PDO statements in MySQL",
+  "bin": [
+    "dump-database"
+  ],
   "keywords": [
     "php",
     "code",
