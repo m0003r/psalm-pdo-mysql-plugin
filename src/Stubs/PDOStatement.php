@@ -18,10 +18,4 @@ class PDOStatement
     public function rowCount(): int
     {
     }
-
-//    /**
-//     * @psalm-assert true|false $this->__psalm_rowCountZero
-//     * @psalm-assert false $this->__psalm_rowCountFetched
-//     */
-//    public function execute() {}
 }

@@ -201,3 +201,38 @@ function zeroRows(PDO $pdo): void {
       | Type                    | Message                                          |
       | PDOStatementZeroRows    | PDO statement has zero remaining rows            |
     And I see no other errors
+
+  Scenario: Fetching without checking for row count
+    Given I have the following code
+"""
+<?php
+
+function unknownRows(PDO $pdo): ?string {
+    $stm = $pdo->query('SELECT t_char FROM basic_types');
+    $ch = $stm->fetchColumn();
+
+    return $ch !== false ? $ch : null;
+}
+"""
+    When I run psalm
+    And I see no errors
+
+  Scenario: Fetching without additional checking for row count
+    Given I have the following code
+"""
+<?php
+
+function unknownRows(PDO $pdo): ?string {
+    $stm = $pdo->query('SELECT t_char FROM basic_types');
+    if ($stm->rowCount()) {
+        $stm->fetchColumn();
+        $ch = $stm->fetchColumn();
+
+        return $ch !== false ? $ch : null;
+    } else {
+        return 'default';
+    }
+}
+"""
+    When I run psalm
+    And I see no errors

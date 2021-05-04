@@ -75,7 +75,7 @@ class TPDOStatement extends TNamedObject
         $zeroType = $context->vars_in_scope[$var_id . '->' . self::PROP_ZERO] ?? new Union([new TBool()]);
         $countFetchedType = $context->vars_in_scope[$var_id . '->' . self::PROP_FETCHED] ?? new Union([new TBool()]);
 
-        if ($countFetchedType->isFalse()) {
+        if (!$countFetchedType->isTrue()) {
             $this->hasRows = null;
             return;
         }
