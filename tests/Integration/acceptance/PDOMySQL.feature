@@ -236,3 +236,16 @@ function unknownRows(PDO $pdo): ?string {
 """
     When I run psalm
     And I see no errors
+
+  Scenario: Chain fetching right after query
+    Given I have the following code
+"""
+<?php
+
+/** @return list<array{t_char: string}> */
+function chainFetch(PDO $pdo): array {
+    return $pdo->query('SELECT t_char FROM basic_types')->fetchAll(PDO::FETCH_ASSOC);
+}
+"""
+    When I run psalm
+    And I see no errors

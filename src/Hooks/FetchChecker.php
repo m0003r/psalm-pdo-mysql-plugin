@@ -48,11 +48,12 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
 
         $var_id = ExpressionIdentifier::getVarId($expr->var, null, $statements_source);
 
-        if (!$var_id) {
-            return;
+        if ($var_id) {
+            $sourceType = $context->vars_in_scope[$var_id];
+        } else {
+            // we use NodeTypeProvider only if there is chaining like $pdo->query(...)->fetch(...)
+            $sourceType = $statements_source->getNodeTypeProvider()->getType($expr->var);
         }
-
-        $sourceType = $context->vars_in_scope[$var_id] ?? null;
 
         if (!$sourceType) {
             return;
@@ -295,11 +296,19 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
                 ]);
             }
 
+            if ($fetch_mode === PDO::FETCH_ASSOC) {
+                $keyType = new Union([
+                    new Type\Atomic\TString(),
+                ]);
+            } else {
+                $keyType = new Union([
+                    new Type\Atomic\TArrayKey(),
+                ]);
+            }
+
             return new Union([
                 new Type\Atomic\TArray([
-                    new Union([
-                        new Type\Atomic\TArrayKey(),
-                    ]),
+                    $keyType,
                     new Union([
                         new TString(),
                         new TNull(),

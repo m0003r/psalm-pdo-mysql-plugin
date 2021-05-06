@@ -70,8 +70,12 @@ class TPDOStatement extends TNamedObject
         return implode('', array_filter($parts));
     }
 
-    public function syncFromContext(Context $context, string $var_id): void
+    public function syncFromContext(Context $context, ?string $var_id): void
     {
+        if ($var_id === null) {
+            return;
+        }
+
         $zeroType = $context->vars_in_scope[$var_id . '->' . self::PROP_ZERO] ?? new Union([new TBool()]);
         $countFetchedType = $context->vars_in_scope[$var_id . '->' . self::PROP_FETCHED] ?? new Union([new TBool()]);
 
@@ -83,8 +87,12 @@ class TPDOStatement extends TNamedObject
         $this->hasRows = !$zeroType->isTrue();
     }
 
-    public function syncToContext(Context $context, string $var_id): void
+    public function syncToContext(Context $context, ?string $var_id): void
     {
+        if ($var_id === null) {
+            return;
+        }
+
         if ($this->hasRows === null) {
             $zeroType = new Union([new TBool()]);
             $countFetchedType = new Union([new TBool()]);
