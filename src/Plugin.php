@@ -12,7 +12,6 @@ use SimpleXMLElement;
 
 class Plugin implements PluginEntryPointInterface
 {
-
     public function __invoke(RegistrationInterface $registration, ?SimpleXMLElement $config = null): void
     {
         if (!$config || !($config->databases instanceof SimpleXMLElement)) {

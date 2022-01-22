@@ -40,7 +40,7 @@ class ParsedStatement
         $this->query = $query;
 
         try {
-            $this->stmt = $this->parseSelect($query);
+            $this->stmt = $this->parseSelect();
             $this->aliases = $knownTables;
 
             $this->parseFrom();
@@ -52,13 +52,13 @@ class ParsedStatement
 
     /**
      */
-    private function parseSelect(string $query): SelectStatement
+    private function parseSelect(): SelectStatement
     {
-        $parser = new Parser($query);
+        $parser = new Parser($this->query);
         $select = $parser->statements[0] ?? null;
 
         if (!$select instanceof SelectStatement) {
-            throw new UnexpectedValueException("Subselect $query should have been parsed to SelectStatement");
+            throw new UnexpectedValueException("Subselect $this->query should have been parsed to SelectStatement");
         }
 
         foreach ($parser->errors as $error) {

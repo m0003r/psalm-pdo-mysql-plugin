@@ -21,14 +21,14 @@
     }
   ],
   "require": {
-    "php": "^7.3|8",
+    "php": "^7.3|^8.0",
     "ext-libxml": "*",
     "ext-pdo": "*",
     "ext-pdo_mysql": "*",
     "ext-simplexml": "*",
     "ext-xmlwriter": "*",
     "phpmyadmin/sql-parser": "^5.4",
-    "vimeo/psalm": "^4.7"
+    "vimeo/psalm": "^4"
   },
   "require-dev": {
     "ext-pcov": "*",

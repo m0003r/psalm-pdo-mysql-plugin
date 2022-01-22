@@ -319,7 +319,7 @@ class SQLParserTest extends TestCase
             $result = SQLParser::parseSQL($query);
         } catch (Throwable $e) {
             if (!$e instanceof UnexpectedValueException) {
-                self::assertEquals(RuntimeException::class, get_class($e));
+                self::assertEquals(RuntimeException::class, $e::class);
                 self::assertStringContainsString('Error parsing query', $e->getMessage());
                 self::assertStringContainsString($query, $e->getMessage());
                 $e = $e->getPrevious();

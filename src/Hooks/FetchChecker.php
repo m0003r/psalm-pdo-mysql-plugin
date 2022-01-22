@@ -16,6 +16,7 @@ use PDO;
 use PhpMyAdmin\SqlParser\Exceptions\ParserException;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\VariadicPlaceholder;
 use Psalm\CodeLocation;
 use Psalm\Internal\Analyzer\Statements\Expression\ExpressionIdentifier;
 use Psalm\IssueBuffer;
@@ -120,7 +121,7 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
     }
 
     /**
-     * @param Arg[] $args
+     * @param (Arg|VariadicPlaceholder)[] $args
      */
     public static function getMethodReturnType(
         TPDOStatement $pdoStatement,
@@ -141,16 +142,28 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
         $firstArgRequired = $methodName !== 'fetchcolumn';
 
         // if first arg is set and it isn't single int literal, we can't do anything
-        if (isset($args[0]) &&
+        $firstArg = $args[0] ?? null;
+
+        if ($firstArg instanceof VariadicPlaceholder) {
+            return null;
+        }
+
+        $secondArg = $args[1] ?? null;
+
+        if ($secondArg instanceof VariadicPlaceholder) {
+            return null;
+        }
+
+        if ($firstArg &&
             (
-                !($first_arg_type = $source->getNodeTypeProvider()->getType($args[0]->value)) ||
+                !($first_arg_type = $source->getNodeTypeProvider()->getType($firstArg->value)) ||
                 !$first_arg_type->isSingleIntLiteral())
         ) {
             return null;
         }
 
         // if it is required and
-        if ($firstArgRequired && !isset($args[0])) {
+        if ($firstArgRequired && !$firstArg) {
             return null;
         }
 
@@ -158,13 +171,15 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
 
         $sqlOut = null;
 
-        if ($pdoStatement->sqlString instanceof TSqlSelectString) {
+        $sqlStr = $pdoStatement->sqlString;
+
+        if ($sqlStr instanceof TSqlSelectString) {
             try {
-                $sqlOut = SQLParser::parseSQL($pdoStatement->sqlString->value);
+                $sqlOut = SQLParser::parseSQL($sqlStr->value);
             } catch (Exception $e) {
                 // it throws UnexpectedValueException only if query is parsed
                 // we don't wanna report parsing of partial queries
-                if ($e instanceof UnexpectedValueException/* || !$strParam->partial*/) {
+                if ($e instanceof UnexpectedValueException || !$sqlStr->partial) {
                     $message = $e->getMessage();
 
                     if (($prev = $e->getPrevious()) && $prev instanceof ParserException) {
@@ -181,8 +196,8 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
 
         if (isset($first_arg_type)
             && ($first_arg_type->getSingleIntLiteral()->value) === PDO::FETCH_CLASS
-            && isset($args[1])
-            && ($second_arg_type = $source->getNodeTypeProvider()->getType($args[1]->value))
+            && $secondArg
+            && ($second_arg_type = $source->getNodeTypeProvider()->getType($secondArg->value))
             && ($second_arg_type->isSingleStringLiteral())
         ) {
             $class_name = $second_arg_type->getSingleStringLiteral()->value;
@@ -215,7 +230,7 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
             $returnType = self::getRowType(
                 PDO::FETCH_COLUMN,
                 $sqlOut,
-                isset($args[0]) ? $first_arg_type->getSingleIntLiteral()->value : 0
+                $firstArg ? $first_arg_type->getSingleIntLiteral()->value : 0
             );
 
             if ($returnType) {
@@ -239,8 +254,8 @@ class FetchChecker implements AfterMethodCallAnalysisInterface
             } elseif ($fetch_mode === PDO::FETCH_COLUMN) {
                 $column = 0;
 
-                if (isset($args[1])
-                    && ($second_arg_type = $source->getNodeTypeProvider()->getType($args[1]->value))
+                if ($secondArg
+                    && ($second_arg_type = $source->getNodeTypeProvider()->getType($secondArg->value))
                     && $second_arg_type->isSingleIntLiteral()
                 ) {
                     $column = $second_arg_type->getSingleIntLiteral()->value;

@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace M03r\PsalmPDOMySQL\Types;
 
-use M03r\PsalmPDOMySQL\Types\TSqlSelectString;
-use Psalm\Plugin\Hook\StringInterpreterInterface;
 use Psalm\Type\Atomic\TLiteralString;
 
 use function preg_match;
 
-class SQLStringProvider implements StringInterpreterInterface
+class SQLStringProvider
 {
     /**
      * @return ?TSqlSelectString

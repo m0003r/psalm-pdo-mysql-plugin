@@ -24,7 +24,7 @@ class PDOMethodsReturnType implements MethodReturnTypeProviderInterface
     /** @inheritDoc */
     public static function getClassLikeNames(): array
     {
-        return array_unique(array_values(array_merge(['PDO'], self::$additionalPDOClasses)));
+        return array_unique(array_merge(['PDO'], self::$additionalPDOClasses));
     }
 
     /** @inheritDoc */
